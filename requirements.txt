@@ -1,0 +1,7 @@
+beanie
+motor
+fastapi
+uvicorn
+pydantic
+python-multipart
+passlib

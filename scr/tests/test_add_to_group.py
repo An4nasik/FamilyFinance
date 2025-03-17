@@ -1,29 +1,35 @@
-from passlib.context import CryptContext
-from pymongo import MongoClient
-
-from scr.schemas.family_scheme import Family, User, Purchase
-
-client = MongoClient("localhost", port=27017)
-families_db =  client["family_db"]
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from scr.models.family_models import Family, User, Purchase
+from scr.database import init_db
+import asyncio
 
 
+async def main():
+    await init_db()
 
-family = Family(
-    group_name="Тестовая",
+    user = User(
+        name="Антон",
+        surname="Тайченачев",
+        email="TaychenachevAA@stud.kai.ru",
+        password="нет"
     )
-user = User(
-    name="Антон",
-    surname="Тайченачев",
-    email="TaychenachevAA@stud.kai.ru",
-    password=pwd_context.hash("нет")
-)
-purchase = Purchase(
-    price=1000.0,
-    description="Тестовая закупка",
-    user_id=user.id
-)
-families_db["users"].insert_one(user.model_dump(by_alias=True))
-families_db["families"].insert_one(family.model_dump(by_alias=True))
-family.add_to_family(user)
-family.add_purchase(purchase)
+    await user.insert()
+
+    family = Family(
+        group_name="Огузки",
+        income=1000.00
+    )
+    await family.insert()
+
+    await family.add_to_family(user)
+
+    purchase = Purchase(
+        price=1500.0,
+        description="командно поели",
+        user_id=user.id
+    )
+    await purchase.insert()
+    await family.add_purchase(purchase)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
