@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Finance Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        #addUserForm input, #addPurchaseForm input, #addPurchaseForm select {
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+            }
+
+        #addUserForm button[type="submit"], #addPurchaseForm button[type="submit"] {
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+            }
+        #addUserForm {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        #addUserForm input {
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+        }
+
+        #addUserForm button[type="submit"] {
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+        }
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --hover-color: #2980b9;
+        }
+
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', system-ui, -apple-system;
+        }
+
+        .dashboard-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .family-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: none;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .family-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .stat-badge {
+            background: var(--secondary-color);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+
+/* Добавить в секцию стилей */
+        #addFamilyForm {
+            background: #f8f9fa;
+            border-radius: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #addFamilyForm input {
+            border-radius: 20px;
+            padding: 0.75rem 1rem;
+        }
+
+        .purchase-item {
+            background: white;
+            margin: 0.5rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--secondary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin: 1rem 0;
+        }
+
+        /* Новые стили */
+        .family-meta {
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+
+        .meta-item {
+            padding: 15px;
+            border-right: 1px solid #eee;
+        }
+
+        .meta-item:last-child {
+            border-right: none;
+        }
+
+        .meta-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <h1 class="mb-4">👨👩👧👦 Family Finance Dashboard</h1>
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <select id="familySelect" class="form-select form-select-lg"
+                            onchange="loadFamilyData(this.value)">
+                        <option value="">Выберите семью...</option>
+                    </select>
+                </div>
+                <div class="col-md-6 text-end mt-3 mt-md-0">
+                    <span class="stat-badge">
+                        <i class="fas fa-database me-2"></i>
+                        Всего семей: <span id="totalFamilies">0</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Кнопка добавления семьи -->
+    <div class="container mt-4">
+        <button class="btn btn-success" onclick="toggleAddFamilyForm()">
+            <i class="fas fa-plus me-2"></i>Создать новую семью
+        </button>
+
+        <!-- Форма создания семьи -->
+        <div id="addFamilyForm" style="display: none;" class="mt-3 col-md-6">
+            <div class="card p-3">
+                <form onsubmit="event.preventDefault(); createNewFamily()">
+                    <div class="mb-3">
+                        <input type="text" class="form-control"
+                               id="familyName" placeholder="Название семьи" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Создать</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="family-meta card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 meta-item">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-calendar-alt meta-icon text-primary"></i>
+                            <div>
+                                <div class="text-muted small">Дата создания</div>
+                                <div id="createdAt" class="fw-bold">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 meta-item">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-wallet meta-icon text-success"></i>
+                            <div>
+                                <div class="text-muted small">Общий баланс</div>
+                                <div id="totalBalance" class="fw-bold">0 ₽</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 meta-item">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-exchange-alt meta-icon text-info"></i>
+                            <div>
+                                <div class="text-muted small">Последняя активность</div>
+                                <div id="lastActivity" class="fw-bold">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="familyInfo" class="row g-4" style="display: none;">
+            <div class="col-lg-4">
+                <div class="family-card card h-100">
+                    <div class="card-body">
+                        <h4 class="card-title mb-4">📊 Основная статистика</h4>
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>
+                                <div class="text-muted small">Участников</div>
+                                <h3 id="membersCount">0</h3>
+                            </div>
+                            <div>
+                                <div class="text-muted small">Общие расходы</div>
+                                <h3 id="totalExpenditure">0 ₽</h3>
+                            </div>
+                        </div>
+                        <canvas id="financeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="family-card card h-100">
+                    <div class="card-body">
+                        <h4 class="card-title mb-4">👥 Участники</h4>
+                        <div id="usersList" class="d-grid gap-2"></div>
+
+                        <!-- Кнопка добавления -->
+                        <button class="btn btn-primary mt-3" onclick="toggleAddUserForm()">
+                            <i class="fas fa-plus me-2"></i>Добавить участника
+                        </button>
+
+                        <!-- Форма добавления -->
+                        <div id="addUserForm" style="display: none;" class="mt-3">
+                            <form onsubmit="event.preventDefault(); addNewUser()">
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="userName" placeholder="Имя" required>
+                                </div>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="userSurname" placeholder="Фамилия"
+                                           required>
+                                </div>
+                                <div class="mb-3">
+                                    <input type="email" class="form-control" id="userEmail" placeholder="Email"
+                                           required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="userPassword"></label><input type="password" class="form-control" id="userPassword"
+                                                                             placeholder="Пароль" required autocomplete="current-password">
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">Добавить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="family-card card h-100">
+                    <div class="card-body">
+                        <h4 class="card-title mb-4">🛒 Последние покупки</h4>
+                        <div id="purchasesList" class="d-grid gap-2"></div>
+
+                        <button class="btn btn-primary mt-3" onclick="toggleAddPurchaseForm()">
+                            <i class="fas fa-plus me-2"></i>Добавить покупку
+                        </button>
+
+                        <div id="addPurchaseForm" style="display: none;">
+                            <form onsubmit="event.preventDefault(); addNewPurchase()">
+                                <div class="mb-3">
+                                    <input type="number" class="form-control" id="purchasePrice"
+                                           placeholder="Сумма" step="0.01" required>
+                                </div>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="purchaseDesc"
+                                           placeholder="Описание" required>
+                                </div>
+                                <div class="mb-3">
+                                    <select class="form-select" id="purchaseUser"></select>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">Добавить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let isFamilyFormVisible = false; // Только одно объявление!
+        let isFormVisible = false;
+        let financeChart = null;
+        let isPurchaseFormVisible = false;
+
+        function toggleAddPurchaseForm() {
+            const form = document.getElementById('addPurchaseForm');
+            isPurchaseFormVisible = !isPurchaseFormVisible;
+            form.style.display = isPurchaseFormVisible ? 'block' : 'none';
+        }
+
+
+        async function loadFamilies() {
+            try {
+                const response = await fetch('http://localhost:8000/families');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const families = await response.json();
+
+                const select = document.getElementById('familySelect');
+                select.innerHTML = '<option value="">Выберите семью...</option>'; // Очистка списка
+                families.forEach(family => {
+                    const option = document.createElement('option');
+                    option.value = family.group_name;
+                    option.textContent = family.group_name;
+                    select.appendChild(option);
+                });
+                document.getElementById('totalFamilies').textContent = families.length;
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                alert('Ошибка загрузки данных. Проверьте консоль.');
+            }
+        }
+        // Инициализация
+        window.onload = async () => {
+            await loadFamilies();
+            document.getElementById('totalFamilies').textContent =
+                    document.getElementById('familySelect').options.length - 1;
+        };
+
+            async function loadFamilyData(familyName) {
+                if (!familyName) {
+                    document.getElementById('familyInfo').style.display = 'none';
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`http://localhost:8000/families/search/?group_name=${familyName}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const familyData = await response.json();
+
+                    const userSelect = document.getElementById('purchaseUser');
+                    userSelect.innerHTML = familyData.users.map(user =>
+                            `<option value="${user.id}">${user.name} ${user.surname}</option>`
+                    ).join('')
+
+                // Обновление мета-данных
+                document.getElementById('createdAt').textContent = familyData.created_at;
+                document.getElementById('totalBalance').textContent =
+                    `${familyData.total_balance.toLocaleString()} ₽`;
+                document.getElementById('lastActivity').textContent =
+                    new Date().toLocaleDateString('ru-RU');
+
+                // Обновление статистики
+                document.getElementById('membersCount').textContent = familyData.users_count;
+                document.getElementById('totalExpenditure').textContent =
+                    `${familyData.expenditure.toLocaleString()} ₽`;
+
+                // Обновление участников
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = familyData.users.map(user => `
+                    <div class="d-flex align-items-center gap-3 p-2 bg-light rounded">
+                        <div class="user-avatar">
+                            ${user.name[0]}${user.surname[0]}
+                        </div>
+                        <div>
+                            <div class="fw-bold">${user.name} ${user.surname}</div>
+                            <small class="text-muted">${user.email}</small>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Обновление покупок
+                const purchasesList = document.getElementById('purchasesList');
+                purchasesList.innerHTML = familyData.purchases.map(purchase => `
+                    <div class="purchase-item">
+                        <div>
+                            <div class="fw-bold">${purchase.description}</div>
+                            <small class="text-muted">${purchase.user_name}</small>
+                        </div>
+                        <div class="text-success fw-bold">
+                            ${purchase.price.toLocaleString()} ₽
+                        </div>
+                    </div>
+                `).join('');
+
+                // Обновление графика
+                if (financeChart) financeChart.destroy();
+                const ctx = document.getElementById('financeChart').getContext('2d');
+                financeChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Доходы', 'Расходы'],
+                        datasets: [{
+                            data: [familyData.income, familyData.expenditure],
+                            backgroundColor: ['#2ecc71', '#e74c3c']
+                        }]
+                    }
+                });
+
+                document.getElementById('familyInfo').style.display = 'flex';
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                alert('Ошибка загрузки данных семьи');
+            }
+        }
+
+        const userSelect = document.getElementById('purchaseUser');
+        userSelect.innerHTML = familyData.users.map(user =>
+                `<option value="${user.id}">${user.name} ${user.surname}</option>`
+        ).join('');
+
+        // Новая функция для добавления покупки
+        async function addNewPurchase() {
+            const familyName = document.getElementById('familySelect').value;
+            const newPurchase = {
+                price: parseFloat(document.getElementById('purchasePrice').value),
+                description: document.getElementById('purchaseDesc').value,
+                user_id: document.getElementById('purchaseUser').value
+            };
+
+            try {
+                const response = await fetch(`/families/${familyName}/purchases`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newPurchase)
+                });
+
+                if (!response.ok) throw new Error(await response.text());
+
+                // Очистка формы и обновление данных
+                document.getElementById('purchasePrice').value = '';
+                document.getElementById('purchaseDesc').value = '';
+                await loadFamilyData(familyName);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка при добавлении покупки: ' + error.message);
+            }
+        }
+
+        function toggleAddFamilyForm() {
+            const form = document.getElementById('addFamilyForm');
+            isFamilyFormVisible = !isFamilyFormVisible;
+            form.style.display = isFamilyFormVisible ? 'block' : 'none';
+        }
+
+        async function createNewFamily() {
+            const familyName = document.getElementById('familyName').value;
+
+            try {
+                const response = await fetch('/families', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({group_name: familyName})
+                });
+
+                if (!response.ok) throw new Error(await response.text());
+
+                // Очистка и обновление
+                document.getElementById('familyName').value = '';
+                toggleAddFamilyForm();
+                await loadFamilies();
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка создания семьи: ' + error.message);
+            }
+        }
+
+        function toggleAddUserForm() {
+            const form = document.getElementById('addUserForm');
+            isFormVisible = !isFormVisible;
+            form.style.display = isFormVisible ? 'block' : 'none';
+        }
+
+        async function addNewUser() {
+            const familyName = document.getElementById('familySelect').value;
+            const newUser = {
+                name: document.getElementById('userName').value,
+                surname: document.getElementById('userSurname').value,
+                email: document.getElementById('userEmail').value,
+                password: document.getElementById('userPassword').value
+            };
+
+            try {
+                const response = await fetch(`/families/${familyName}/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newUser)
+                });
+
+                if (!response.ok) throw new Error(await response.text());
+
+                // Очистка формы и обновление данных
+                toggleAddUserForm();
+                await loadFamilyData(familyName);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка при добавлении пользователя: ' + error.message);
+            }
+        }
+
+    </script>
+</body>
+</html>

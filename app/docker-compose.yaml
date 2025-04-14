@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - MONGO_HOST=mongo
+      - MONGO_PORT=27017
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:5.0
+    container_name: mongo_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/mongo_data
+
+volumes:
+  mongo_data:
