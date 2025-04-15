@@ -70,7 +70,7 @@
 
 3. Запустите сервер:
     ```sh
-    uvicorn scr.main:app --reload
+    uvicorn app.main:app --reload
     ```
 
 4. Откройте браузер и перейдите по адресу `http://127.0.0.1:8000`.

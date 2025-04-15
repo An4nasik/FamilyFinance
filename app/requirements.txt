@@ -1,0 +1,10 @@
+beanie
+motor
+fastapi
+uvicorn
+pydantic
+python-multipart
+passlib
+pydantic[email]
+bcrypt
+jinja2
