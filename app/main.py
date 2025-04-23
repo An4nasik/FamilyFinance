@@ -1,5 +1,5 @@
 import logging
-
+from fastapi.responses import JSONResponse
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -38,7 +38,6 @@ app.include_router(router)
 async def serve_dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
-from fastapi.responses import JSONResponse
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

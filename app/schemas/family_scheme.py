@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, SecretStr, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from bson import ObjectId
 from typing import List
 from pymongo import MongoClient

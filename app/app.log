@@ -45,3 +45,12 @@ Traceback (most recent call last):
     version = _bcrypt.__about__.__version__
               ^^^^^^^^^^^^^^^^^
 AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-04-15 14:01:12,552 - main - INFO - /app/main.py:15 - Application started
+2025-04-15 17:04:42,602 - __main__ - INFO - C:\projects\FamilyFinance\app\main.py:15 - Application started
+2025-04-15 14:29:30,971 - main - INFO - /app/main.py:15 - Application started
+2025-04-15 16:19:49,864 - main - INFO - /app/main.py:15 - Application started
+2025-04-15 16:20:13,333 - passlib.handlers.bcrypt - WARNING - /usr/local/lib/python3.10/site-packages/passlib/handlers/bcrypt.py:622 - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+AttributeError: module 'bcrypt' has no attribute '__about__'

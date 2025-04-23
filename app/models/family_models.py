@@ -2,12 +2,11 @@ from typing import List, Optional
 from bson import ObjectId as BsonObjectId
 from beanie import Document
 from passlib.context import CryptContext
-from pydantic import Field, EmailStr, BaseModel, root_validator
+from pydantic import Field, EmailStr
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Custom ObjectId type with validation
-from bson import ObjectId as BsonObjectId
 
 class ObjectId(BsonObjectId):
     @classmethod
@@ -15,7 +14,7 @@ class ObjectId(BsonObjectId):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v):
+    def validate(cls, v, info):
         if isinstance(v, str):
             try:
                 return cls(v)
@@ -26,9 +25,10 @@ class ObjectId(BsonObjectId):
         raise ValueError("Invalid ObjectId")
 
     @classmethod
-    def __get_pydantic_json_schema__(cls):
+    def __get_pydantic_json_schema__(cls, schema):
         # Define the JSON schema for ObjectId
-        return {"type": "string", "format": "objectid"}
+        schema.update({"type": "string", "format": "objectid"})
+        return schema
 
 class Config:
     model_config = {
