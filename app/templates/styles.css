@@ -1,0 +1,125 @@
+#addUserForm input, #addPurchaseForm input, #addPurchaseForm select {
+    border-radius: 20px;
+    padding: 0.75rem 1rem;
+}
+
+#addUserForm button[type="submit"], #addPurchaseForm button[type="submit"] {
+    border-radius: 20px;
+    padding: 0.75rem 1rem;
+}
+#addUserForm {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+#addUserForm input {
+    border-radius: 20px;
+    padding: 0.75rem 1rem;
+}
+
+#addUserForm button[type="submit"] {
+    border-radius: 20px;
+    padding: 0.75rem 1rem;
+}
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --hover-color: #2980b9;
+}
+
+body {
+    background: #f8f9fa;
+    font-family: 'Segoe UI', system-ui, -apple-system;
+}
+
+.dashboard-header {
+    background: var(--primary-color);
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.family-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.family-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}
+
+.stat-badge {
+    background: var(--secondary-color);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+
+#addFamilyForm {
+    background: #f8f9fa;
+    border-radius: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#addFamilyForm input {
+    border-radius: 20px;
+    padding: 0.75rem 1rem;
+}
+
+.purchase-item {
+    background: white;
+    margin: 0.5rem 0;
+    padding: 1rem;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--secondary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+}
+
+.chart-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin: 1rem 0;
+}
+
+/* Новые стили */
+.family-meta {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
+
+.meta-item {
+    padding: 15px;
+    border-right: 1px solid #eee;
+}
+
+.meta-item:last-child {
+    border-right: none;
+}
+
+.meta-icon {
+    font-size: 24px;
+    margin-right: 10px;
+}
