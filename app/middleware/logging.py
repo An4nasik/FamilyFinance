@@ -4,6 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from fastapi import Request, Response
 
 request_id_ctx = contextvars.ContextVar("request_id", default=None)
+
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         rid = str(uuid4())
