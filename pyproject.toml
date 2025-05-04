@@ -1,10 +1,12 @@
 [project]
 name = "familyfinance"
-version = "1.0.0"
+version = "2.0.0"
 description = "API для управления семейными финансами"
 readme = "README.md"
-license = { text = "MIT" }
-authors = [ { name="Your Name", email="you@example.com" } ]
+license = { text = "" }
+authors = [ { name="Ya (Anton T)", email="A.tichenachev@yandex.ru" } ]
+
+#Там траблы с этими зависимостями, все че надо - оно в requirements.txt
 dependencies = [
   "fastapi>=0.100.0,<0.101.0",
   "uvicorn[standard]>=0.22.0,<0.23.0",

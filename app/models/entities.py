@@ -9,7 +9,7 @@ class Family(BaseModel):
     group_name: str
     tags: List[str] = []
     users: List[ObjectId] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
 class User(BaseModel):
     id: ObjectId = Field(default_factory=ObjectId, alias="_id")
@@ -17,11 +17,11 @@ class User(BaseModel):
     email: str
     password: str
     group_id: ObjectId
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
 class Transaction(BaseModel):
     id: ObjectId = Field(default_factory=ObjectId, alias="_id")
     user_id: ObjectId
     amount: float
     tags: List[str] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
