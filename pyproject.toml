@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "API для управления семейными финансами"
 readme = "README.md"
 license = { text = "" }
-authors = [ { name="Ya(Anton T", email="A.tichenachev@yandex.ru" } ]
+authors = [ { name="Ya (Anton T)", email="A.tichenachev@yandex.ru" } ]
 
 #Там траблы с этими зависимостями, все че надо - оно в requirements.txt
 dependencies = [
