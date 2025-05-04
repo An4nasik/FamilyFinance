@@ -9,14 +9,17 @@ class UserService:
         self.repo = UserRepo()
 
     async def add(self, fid: str, data: UserCreate) -> UserRead:
-        data.password = pwd_context.hash(data.password)
-        u = await self.repo.create(fid, data)
-        return UserRead(
-            id=str(u.id),
-            name=u.name,
-            email=u.email,
-            created_at=u.created_at,
-        )
+        try:
+            data.password = pwd_context.hash(data.password)
+            u = await self.repo.create(fid, data)
+            return UserRead(
+                id=str(u.id),
+                name=u.name,
+                email=u.email,
+                created_at=u.created_at,
+            )
+        except ValueError as e:
+            raise ValueError(f"Error adding user: {e}")
 
     async def list(self, fid: str) -> list[UserRead]:
         us = await self.repo.list_by_family(fid)
