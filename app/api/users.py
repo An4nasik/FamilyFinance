@@ -12,7 +12,10 @@ async def list_users(family_id: str):
 
 @router.post("", status_code=201)
 async def add_user(family_id: str, data: UserCreate):
-    return await service.add(family_id, data)
+    try:
+        return await service.add(family_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))  # Возвращаем ошибку 400 с сообщением
 
 @router.delete("/{user_id}")
 async def remove_user(family_id: str, user_id: str):
