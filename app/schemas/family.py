@@ -10,7 +10,7 @@ class FamilyRead(BaseModel):
     id: str
     group_name: str
     tags: List[str]
-    users: List[str]  # Добавлено поле users
+    users: List[str]
     created_at: datetime
 
 class FamilyUpdate(BaseModel):
