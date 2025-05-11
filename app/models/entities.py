@@ -5,6 +5,7 @@ from pydantic import Field
 from app.models.base import BaseModel
 from datetime import date
 
+BASE_TAGS = ["еда", "транспорт", "развлечения", "досуг", "другое"]
 
 class Family(BaseModel):
     id: ObjectId = Field(default_factory=ObjectId, alias="_id")
@@ -25,6 +26,6 @@ class Transaction(BaseModel):
     id: ObjectId = Field(default_factory=ObjectId, alias="_id")
     user_id: ObjectId
     amount: float
-    tags: List[str] = ["еда", "транспорт", "развлечения", "досуг", "другое"]
+    tags: List[str] = BASE_TAGS
     date: str
     created_at: datetime = Field(default_factory=datetime.now)
