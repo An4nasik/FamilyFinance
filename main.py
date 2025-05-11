@@ -1,6 +1,4 @@
-def main():
-    print("Hello from ffv2!")
+from datetime import datetime
 
-
-if __name__ == "__main__":
-    main()
+buy_date = datetime(2025, 5, 8).strftime("%Y-%m-%d")
+print(buy_date)

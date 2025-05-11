@@ -12,7 +12,7 @@ async def list_ops(family_id: str):
 
 @router.post("/purchases", status_code=201)
 async def add_purchase(family_id: str, data: PurchaseCreate):
-    return await service.purchase(data)
+    return await service.purchase(family_id, data)  # Передаем family_id и data
 
 @router.post("/topups", status_code=201)
 async def add_topup(family_id: str, data: TopUpCreate):
