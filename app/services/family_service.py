@@ -13,6 +13,7 @@ class FamilyService:
             id=str(fam.id),
             group_name=fam.group_name,
             tags=fam.tags,
+            users=[],  # Инициализируем поле users как пустой список
             created_at=fam.created_at,
         )
 
@@ -25,6 +26,7 @@ class FamilyService:
                 id=str(f.id),
                 group_name=f.group_name,
                 tags=f.tags,
+                users=[str(u) for u in getattr(f, "users", [])],  # Инициализируем users как пустой список, если его нет
                 created_at=f.created_at,
             ))
         return out
@@ -33,11 +35,11 @@ class FamilyService:
         f = await self.repo.get(fid)
         if not f:
             return None
-        exp = await self.tx.sum_expenditure(fid)
         return FamilyRead(
             id=fid,
             group_name=f.group_name,
             tags=f.tags,
+            users=[str(u) for u in f.users],  # Поле users возвращается
             created_at=f.created_at,
         )
 
