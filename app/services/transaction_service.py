@@ -26,12 +26,9 @@ class TransactionService:
             "date": t.date
         }
 
-    async def topup(self, data: TopUpCreate):
-        t = await self.repo.create_topup(data)
-        return {
-            "topup_id": str(t.id),
-            "date": t.date
-        }
+    async def topup(self, family_id: str, data: TopUpCreate):
+        t = await self.repo.create_topup(data, family_id)
+        return {"topup_id": str(t.id), "date": t.date}
 
     async def remove(self, tid: str) -> bool:
         return await self.repo.delete(tid)

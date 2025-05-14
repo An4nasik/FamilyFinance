@@ -16,7 +16,7 @@ async def add_purchase(family_id: str, data: PurchaseCreate):
 
 @router.post("/topups", status_code=201)
 async def add_topup(family_id: str, data: TopUpCreate):
-    return await service.topup(data)
+    return await service.topup(family_id, data)
 
 @router.delete("/transactions/{op_id}")
 async def delete_op(family_id: str, op_id: str):
