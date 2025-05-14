@@ -25,6 +25,7 @@ class User(BaseModel):
 class Transaction(BaseModel):
     id: ObjectId = Field(default_factory=ObjectId, alias="_id")
     user_id: ObjectId
+    amount: float = 0.0  # <-- add this field
     tags: List[str] = BASE_TAGS
     date: str
     created_at: datetime = Field(default_factory=datetime.now)

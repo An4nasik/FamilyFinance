@@ -34,12 +34,13 @@ class TransactionRepo:
 
         return t
 
-    async def create_topup(self, data: TopUpCreate) -> Transaction:
+    async def create_topup(self, data: TopUpCreate, family_id: str) -> Transaction:
         payload = data.model_dump()
         payload["user_id"] = ObjectId(payload["user_id"])
-        payload["amount"] = abs(data.amount)  # Устанавливаем положительное значение для пополнения
+        payload["amount"] = abs(data.amount)
         t = Transaction(**payload)
         await self.coll.insert_one(t.model_dump(by_alias=True))
+        await self.family_repo.add_tags(family_id, data.tags)  # <-- add tags
         return t
 
     async def delete(self, tid: str) -> bool:
