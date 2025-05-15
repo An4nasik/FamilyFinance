@@ -1,0 +1,144 @@
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --hover-color: #2980b9;
+}
+
+body {
+    background: #f8f9fa;
+    font-family: 'Segoe UI', system-ui, -apple-system;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: #007bff;
+    color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.list-group-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+button {
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+main {
+    padding: 1rem;
+}
+
+section {
+    margin-bottom: 2rem;
+}
+
+form label {
+    display: block;
+    margin: 0.5rem 0 0.2rem;
+}
+
+form input, form select, form button {
+    display: block;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    width: 100%;
+    max-width: 300px;
+}
+
+.dashboard-header {
+    background: var(--primary-color);
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.family-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.family-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}
+
+.stat-badge {
+    background: var(--secondary-color);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.purchase-item {
+    background: white;
+    margin: 0.5rem 0;
+    padding: 1rem;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--secondary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+}
+
+.chart-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin: 1rem 0;
+}
+
+.family-meta {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
+
+.meta-item {
+    padding: 15px;
+    border-right: 1px solid #eee;
+}
+
+.meta-item:last-child {
+    border-right: none;
+}
+
+.meta-icon {
+    font-size: 24px;
+    margin-right: 10px;
+}

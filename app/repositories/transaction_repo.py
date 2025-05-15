@@ -40,7 +40,7 @@ class TransactionRepo:
         payload["amount"] = abs(data.amount)
         t = Transaction(**payload)
         await self.coll.insert_one(t.model_dump(by_alias=True))
-        await self.family_repo.add_tags(family_id, data.tags)  # <-- add tags
+        await self.family_repo.add_tags(family_id, data.tags) 
         return t
 
     async def delete(self, tid: str) -> bool:
