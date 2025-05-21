@@ -70,12 +70,12 @@ jobs:
               diffSize,
               filesData: detailedFiles
             };
-
   code-analysis:
     name: Advanced Code Analysis
     needs: metadata-collection
     runs-on: ubuntu-latest
-    steps:      - name: Checkout PR code
+    steps:
+      - name: Checkout PR code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -129,20 +129,19 @@ jobs:
               prNumber
             });
             
-            const files = repository.pullRequest.files.nodes;
-            const commitSha = repository.pullRequest.commits.nodes[0]?.commit.oid;
-            
+            const files = repository.pullRequest.files.nodes;            const commitSha = repository.pullRequest.commits.nodes[0]?.commit.oid;
             // Write files data to a JSON file for analysis
             const fs = require('fs');
             fs.writeFileSync('pr_files.json', JSON.stringify(files, null, 2));
-              return {
+            
+            return {
               filesCount: files.length,
               commitSha
             };
-            
-      - name: Analyze Code
+              - name: Analyze Code
         id: code-analysis
-        run: |          # Use Python code analysis tools
+        run: |
+          # Use Python code analysis tools
           python -c "
 import json
 import os
@@ -211,12 +210,12 @@ pip install bandit
       - name: Generate Advanced Review Report
         id: review-report
         run: |
-          # Combine results from different analyses
-          echo "## 🔍 Advanced PR Analysis Report (v2025)" > review.md
+          # Combine results from different analyses          echo "## 🔍 Advanced PR Analysis Report (v2025)" > review.md
           echo "" >> review.md
           echo "### 📊 Pull Request Statistics" >> review.md
           echo "- **Branch:** \`${{ needs.metadata-collection.outputs.branch_name }}\`" >> review.md
-          echo "- **Files Changed:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md          echo "- **Total Changes:** ${{ needs.metadata-collection.outputs.diff_size }} (additions + deletions)" >> review.md
+          echo "- **Files Changed:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md
+          echo "- **Total Changes:** ${{ needs.metadata-collection.outputs.diff_size }} (additions + deletions)" >> review.md
           echo "" >> review.md
           
           # Add code analysis
@@ -259,7 +258,7 @@ pip install bandit
             const fs = require('fs');
             const reviewContent = fs.readFileSync('review.md', 'utf8');
             
-            // Check if comment already exists and update it
+                        // Check if comment already exists and update it
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,

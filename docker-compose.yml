@@ -5,17 +5,22 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     ports:
-      - "127.0.0.1:8000:8000"  # Слушаем только локально
+      - "127.0.0.1:8080:8080"  # Слушаем только локально
     volumes:
       - .:/app:delegated
-    env_file:
-      - .env
     depends_on:
       - mongo
+      - loki
+      - prometheus
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB=family_finance_db
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+    logging:
+      driver: json-file
+      options:
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+    restart: unless-stopped
 
   mongo:
     image: mongo:6.0
@@ -25,7 +30,57 @@ services:
     volumes:
       - mongo_data:/data/db
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+        
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    ports:
+      - "9080:9080"
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./grafana/promtail-config.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    privileged: true
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./grafana/loki-config.yaml:/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
 
 volumes:
   mongo_data:
-
+  grafana_data:
+  prometheus_data:

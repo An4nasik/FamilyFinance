@@ -3,6 +3,7 @@ uvicorn[standard]>=0.22.0,<0.23.0
 motor==3.6.0
 pydantic~=2.11.4
 python-json-logger>=2.0.7,<2.1.0
+prometheus-client
 passlib[bcrypt]>=1.7.4,<1.8.0
 python-jose[cryptography]
 python-dotenv>=0.21.0,<0.22.0

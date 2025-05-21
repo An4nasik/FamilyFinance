@@ -54,7 +54,7 @@ jobs:
               core.setOutput('pr_number', prNumber);
             return { prNumber };
       
-      # Since Firecrawl MCP is a fictional tool, we'll simulate its functionality
+      # Set up Python for code analysis
       - name: Setup Python for code analysis
         uses: actions/setup-python@v4
         with:
@@ -65,7 +65,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pylint pytest coverage pytest-asyncio black mypy
-          # Install additional tools that would simulate Firecrawl MCP functionality
+          # Install additional tools for advanced code analysis
           pip install lizard radon bandit
       
       - name: Get PR changes
