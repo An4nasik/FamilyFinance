@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  models: read
 
 jobs:
   ai-review:
@@ -35,7 +34,7 @@ jobs:
           echo "URL diff: $DIFF_URL"
 
           # Скачиваем diff и сохраняем в файл
-          curl -s "$DIFF_URL" > pr_diff.txt
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$DIFF_URL" > pr_diff.txt
 
           # Проверяем содержимое файла diff
           if [[ ! -s pr_diff.txt ]]; then
