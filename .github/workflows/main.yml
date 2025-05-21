@@ -24,12 +24,14 @@ jobs:
             echo "Ошибка: Файл pr_diff.txt пустой или отсутствует"
             exit 1
           fi
+          echo "Содержимое pr_diff.txt:"
           cat pr_diff.txt
 
       - name: AI Review via GitHub Models API
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         run: |
+          # Отправляем запрос к API и сохраняем ответ
           RESPONSE=$(curl -s "https://models.github.ai/inference/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -41,15 +43,17 @@ jobs:
               "model": "openai/gpt-4o"
             }')
 
-          # Отладка: Вывести ответ API
-          echo "API Response: $RESPONSE"
+          # Выводим ответ API для отладки
+          echo "Ответ API:"
+          echo "$RESPONSE"
 
-          # Проверка валидности JSON-ответа
+          # Проверяем, что ответ API содержит корректный JSON
           echo "$RESPONSE" | jq . || {
             echo "Ошибка: Некорректный JSON от API"
             exit 1
           }
 
+          # Извлекаем ревью из ответа API
           REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
           echo "$REVIEW" > review.txt
 
