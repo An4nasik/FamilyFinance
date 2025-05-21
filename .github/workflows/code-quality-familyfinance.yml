@@ -1,0 +1,232 @@
+name: Проверка качества кода Python
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  quality-checks:
+    name: Проверка качества кода
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout код
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Настройка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Установка зависимостей
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black mypy pytest coverage pytest-asyncio
+          
+          # Устанавливаем зависимости проекта
+          if [ -f app/requirements.txt ]; then
+            pip install -r app/requirements.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+      
+      - name: Проверка кода с Flake8
+        id: flake8
+        continue-on-error: true
+        run: |
+          # Останавливаем сборку при ошибках синтаксиса Python или неопределенных именах
+          flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics > flake8_errors.txt || true
+          # Генерируем отчет по всем нарушениям стиля
+          flake8 app --count --max-complexity=10 --max-line-length=127 --statistics > flake8_warnings.txt || true
+      
+      - name: Проверка форматирования с Black
+        id: black
+        continue-on-error: true
+        run: |
+          # Создаем список файлов Python, которые были изменены в PR
+          files_changed=$(git diff --name-only --diff-filter=ACMRT origin/main... | grep '\.py$' || echo "")
+          
+          if [ -n "$files_changed" ]; then
+            black --check --diff $files_changed > black_output.txt || true
+          else
+            echo "Нет измененных Python файлов для проверки" > black_output.txt
+          fi
+      
+      - name: Проверка типов с mypy
+        id: mypy
+        continue-on-error: true
+        run: |
+          # Проверяем типы в директории app
+          if [ -d "app" ]; then
+            mypy app --ignore-missing-imports --disallow-untyped-defs --disallow-incomplete-defs > mypy_output.txt || true
+          else
+            echo "Директория app не найдена" > mypy_output.txt
+          fi
+      
+      - name: Запуск тестов с pytest
+        id: pytest
+        continue-on-error: true
+        run: |
+          # Запускаем тесты с pytest
+          if [ -d "tests" ]; then
+            pytest -xvs tests > pytest_output.txt || true
+          else
+            echo "Директория tests не найдена" > pytest_output.txt
+          fi
+      
+      - name: Проверка тестового покрытия
+        id: coverage
+        continue-on-error: true
+        run: |
+          # Проверяем покрытие тестами
+          if [ -d "app" ] && [ -d "tests" ]; then
+            coverage run -m pytest tests
+            coverage report > coverage_output.txt || true
+            coverage xml
+          else
+            echo "Директории для проверки покрытия не найдены" > coverage_output.txt
+          fi
+      
+      - name: Публикация отчета о качестве кода
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            
+            // Функция для чтения файла, если он существует
+            const readFileIfExists = (filename) => {
+              try {
+                return fs.readFileSync(filename, 'utf8').trim();
+              } catch (e) {
+                return '';
+              }
+            };
+            
+            // Получаем результаты всех проверок
+            const flake8Errors = readFileIfExists('flake8_errors.txt');
+            const flake8Warnings = readFileIfExists('flake8_warnings.txt');
+            const blackOutput = readFileIfExists('black_output.txt');
+            const mypyOutput = readFileIfExists('mypy_output.txt');
+            const pytestOutput = readFileIfExists('pytest_output.txt');
+            const coverageOutput = readFileIfExists('coverage_output.txt');
+            
+            // Создаем отчет
+            let report = `## 🔍 Отчет о качестве кода Python
+
+### 📊 Сводная информация
+${flake8Errors.includes('E') || flake8Errors.includes('F') ? '❌' : '✅'} **Линтинг (критичный)**: ${flake8Errors.includes('E') || flake8Errors.includes('F') ? 'Найдены ошибки' : 'Пройдено'}
+${flake8Warnings.length > 0 && !flake8Warnings.includes('No') ? '⚠️' : '✅'} **Линтинг (стиль)**: ${flake8Warnings.length > 0 && !flake8Warnings.includes('No') ? 'Найдены предупреждения' : 'Пройдено'}
+${blackOutput.includes('would reformat') ? '❌' : '✅'} **Форматирование**: ${blackOutput.includes('would reformat') ? 'Требуется форматирование' : 'Пройдено'}
+${mypyOutput.includes('error:') ? '⚠️' : '✅'} **Проверка типов**: ${mypyOutput.includes('error:') ? 'Найдены проблемы' : 'Пройдено'}
+${pytestOutput.includes('FAILED') ? '❌' : '✅'} **Тесты**: ${pytestOutput.includes('FAILED') ? 'Есть падающие тесты' : 'Все тесты пройдены'}
+${coverageOutput.includes('TOTAL') ? (parseFloat(coverageOutput.match(/TOTAL\s+\d+\s+\d+\s+(\d+)%/)?.[1] || '0') < 70 ? '⚠️' : '✅') : '⚠️'} **Покрытие тестами**: ${coverageOutput.includes('TOTAL') ? coverageOutput.match(/TOTAL\s+\d+\s+\d+\s+(\d+)%/)?.[1] + '%' : 'Не измерено'}
+
+`;
+            
+            // Добавляем подробные отчеты, если есть проблемы
+            if (flake8Errors.includes('E') || flake8Errors.includes('F')) {
+              report += `### ❌ Критические проблемы линтинга
+\`\`\`
+${flake8Errors.length > 1500 ? flake8Errors.substring(0, 1500) + "\n... (вывод сокращен)" : flake8Errors}
+\`\`\`
+
+`;
+            }
+            
+            if (flake8Warnings.length > 0 && !flake8Warnings.includes('No')) {
+              report += `### ⚠️ Предупреждения о стиле кода
+\`\`\`
+${flake8Warnings.length > 1000 ? flake8Warnings.substring(0, 1000) + "\n... (вывод сокращен)" : flake8Warnings}
+\`\`\`
+
+`;
+            }
+            
+            if (blackOutput.includes('would reformat')) {
+              report += `### ❌ Проблемы форматирования кода
+\`\`\`diff
+${blackOutput.length > 1000 ? blackOutput.substring(0, 1000) + "\n... (вывод сокращен)" : blackOutput}
+\`\`\`
+
+`;
+            }
+            
+            if (mypyOutput.includes('error:')) {
+              report += `### ⚠️ Проблемы с типами
+\`\`\`
+${mypyOutput.length > 1000 ? mypyOutput.substring(0, 1000) + "\n... (вывод сокращен)" : mypyOutput}
+\`\`\`
+
+`;
+            }
+            
+            if (pytestOutput.includes('FAILED')) {
+              report += `### ❌ Падающие тесты
+\`\`\`
+${pytestOutput.length > 1000 ? pytestOutput.substring(0, 1000) + "\n... (вывод сокращен)" : pytestOutput}
+\`\`\`
+
+`;
+            }
+            
+            if (coverageOutput.length > 0) {
+              report += `### 📊 Отчет о покрытии тестами
+\`\`\`
+${coverageOutput.length > 1000 ? coverageOutput.substring(0, 1000) + "\n... (вывод сокращен)" : coverageOutput}
+\`\`\`
+
+`;
+            }
+            
+            report += `### 💡 Рекомендации
+
+1. **Следуйте стилю PEP 8** для поддержания единообразия кода
+2. **Добавляйте аннотации типов** для улучшения статического анализа
+3. **Форматируйте код с Black** перед созданием PR
+4. **Покрывайте новую функциональность тестами**
+5. **Используйте документацию** для описания сложных алгоритмов и решений
+
+`;
+            
+            // Находим или создаем комментарий в PR
+            const issueNumber = context.issue.number || context.payload.pull_request?.number;
+            
+            if (!issueNumber) {
+              console.log('Не удалось определить номер PR или issue');
+              return;
+            }
+            
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber
+            });
+            
+            const qualityComment = comments.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('Отчет о качестве кода Python')
+            );
+            
+            if (qualityComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: qualityComment.id,
+                body: report
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: report
+              });
+            }

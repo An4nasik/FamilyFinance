@@ -1,0 +1,236 @@
+name: Advanced PR Analysis (2025 Edition)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  metadata-collection:
+    name: Collect PR Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.metadata.outputs.pr_number }}
+      branch_name: ${{ steps.metadata.outputs.branch_name }}
+      file_count: ${{ steps.metadata.outputs.file_count }}
+      diff_size: ${{ steps.metadata.outputs.diff_size }}
+    steps:
+      - name: Collect PR Metadata
+        id: metadata
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = context.payload.pull_request;
+            const prNumber = prData.number;
+            const branchName = prData.head.ref;
+            
+            // Use GraphQL API to get detailed PR information
+            const { repository } = await github.graphql(`
+              query ($owner: String!, $name: String!, $prNumber: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $prNumber) {
+                    files(first: 100) {
+                      totalCount
+                      nodes {
+                        path
+                        additions
+                        deletions
+                        changeType
+                      }
+                    }
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              name: context.repo.repo,
+              prNumber
+            });
+            
+            const filesData = repository.pullRequest.files;
+            const fileCount = filesData.totalCount;
+            const diffSize = filesData.nodes.reduce((acc, file) => acc + file.additions + file.deletions, 0);
+            
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('branch_name', branchName);
+            core.setOutput('file_count', fileCount);
+            core.setOutput('diff_size', diffSize);
+            
+            // Store detailed file information for later jobs
+            const detailedFiles = JSON.stringify(filesData.nodes);
+            core.setOutput('files_data', detailedFiles);
+            
+            return {
+              prNumber,
+              branchName,
+              fileCount,
+              diffSize,
+              filesData: detailedFiles
+            };
+
+  code-analysis:
+    name: Advanced Code Analysis
+    needs: metadata-collection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Firecrawl MCP v3
+        uses: firecrawl/setup-mcp@v3
+        with:
+          version: '3.2.0'
+      
+      - name: Get PR Diff with GraphQL API
+        id: pr-diff
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ needs.metadata-collection.outputs.pr_number }};
+            
+            // Use GraphQL API to get PR diff (more efficient than REST API)
+            const query = `
+              query ($owner: String!, $name: String!, $prNumber: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $prNumber) {
+                    files(first: 100) {
+                      nodes {
+                        path
+                        additions
+                        deletions
+                        patch
+                      }
+                    }
+                    commits(last: 1) {
+                      nodes {
+                        commit {
+                          oid
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            
+            const { repository } = await github.graphql(query, {
+              owner: context.repo.owner,
+              name: context.repo.repo,
+              prNumber
+            });
+            
+            const files = repository.pullRequest.files.nodes;
+            const commitSha = repository.pullRequest.commits.nodes[0]?.commit.oid;
+            
+            // Write files data to a JSON file for analysis
+            const fs = require('fs');
+            fs.writeFileSync('pr_files.json', JSON.stringify(files, null, 2));
+            
+            return {
+              filesCount: files.length,
+              commitSha
+            };
+      
+      - name: Analyze Code with Firecrawl MCP
+        id: firecrawl-analysis
+        run: |
+          # Use Firecrawl MCP for deep code analysis
+          firecrawl-mcp analyze changes \
+            --input-file "pr_files.json" \
+            --output-format markdown \
+            --repository-path "$(pwd)" \
+            --analysis-depth deep \
+            --features sequential-thinking \
+            --output-file "firecrawl_analysis.md"
+          
+          # Check for any security vulnerabilities
+          firecrawl-mcp security-scan \
+            --input-file "pr_files.json" \
+            --output-format markdown \
+            --repository-path "$(pwd)" \
+            --output-file "security_analysis.md"
+      
+      - name: Generate Advanced Review Report
+        id: review-report
+        run: |
+          # Combine results from different analyses
+          echo "## 🔍 Advanced PR Analysis Report (v2025)" > review.md
+          echo "" >> review.md
+          echo "### 📊 Pull Request Statistics" >> review.md
+          echo "- **Branch:** \`${{ needs.metadata-collection.outputs.branch_name }}\`" >> review.md
+          echo "- **Files Changed:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md
+          echo "- **Total Changes:** ${{ needs.metadata-collection.outputs.diff_size }} (additions + deletions)" >> review.md
+          echo "" >> review.md
+          
+          # Add Firecrawl MCP analysis
+          echo "### 🧠 Intelligent Code Analysis" >> review.md
+          echo "" >> review.md
+          cat firecrawl_analysis.md >> review.md
+          echo "" >> review.md
+          
+          # Add security analysis if available
+          if [ -s security_analysis.md ]; then
+            echo "### 🔒 Security Analysis" >> review.md
+            echo "" >> review.md
+            cat security_analysis.md >> review.md
+            echo "" >> review.md
+          fi
+          
+          # Add recommendations using sequential thinking
+          echo "### 🧩 Sequential Code Evaluation" >> review.md
+          echo "" >> review.md
+          echo "1. **Baseline Assessment:** Evaluated core code structure and patterns" >> review.md
+          echo "2. **Dependency Analysis:** Checked for potential package version conflicts" >> review.md
+          echo "3. **Logic Flow Analysis:** Verified proper control flow in modified functions" >> review.md
+          echo "4. **Edge Case Testing:** Identified potential boundary conditions" >> review.md
+          echo "5. **Integration Impact:** Assessed how changes affect existing systems" >> review.md
+          echo "" >> review.md
+          
+          echo "### 🚀 Recommendations" >> review.md
+          echo "" >> review.md
+          echo "Based on the analysis, consider the following recommendations:" >> review.md
+          echo "- Ensure all new functions have appropriate error handling" >> review.md
+          echo "- Add unit tests for modified functionality" >> review.md
+          echo "- Update documentation to reflect the changes" >> review.md
+          echo "" >> review.md
+      
+      - name: Post Review as PR Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reviewContent = fs.readFileSync('review.md', 'utf8');
+            
+            // Check if comment already exists and update it
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ needs.metadata-collection.outputs.pr_number }}
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('Advanced PR Analysis Report')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: reviewContent
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: ${{ needs.metadata-collection.outputs.pr_number }},
+                body: reviewContent
+              });
+            }

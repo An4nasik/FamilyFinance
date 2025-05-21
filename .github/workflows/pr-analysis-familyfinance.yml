@@ -1,0 +1,377 @@
+name: Анализ Pull Request (Май 2025)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  metadata-collection:
+    name: Сбор метаданных PR
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.metadata.outputs.pr_number }}
+      branch_name: ${{ steps.metadata.outputs.branch_name }}
+      file_count: ${{ steps.metadata.outputs.file_count }}
+      diff_size: ${{ steps.metadata.outputs.diff_size }}
+    steps:
+      - name: Получение метаданных PR
+        id: metadata
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prData = context.payload.pull_request;
+            const prNumber = prData ? prData.number : null;
+            const branchName = prData ? prData.head.ref : null;
+            
+            if (!prNumber && !context.payload.workflow_dispatch) {
+              core.setFailed('Этот workflow должен запускаться только на PR или вручную');
+              return;
+            }
+            
+            // Получаем номер PR из контекста или параметра
+            let number = prNumber;
+            if (!number && context.payload.workflow_dispatch) {
+              const issuePayload = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                sort: 'updated',
+                direction: 'desc'
+              });
+              
+              const prs = issuePayload.data.filter(issue => issue.pull_request);
+              if (prs.length > 0) {
+                number = prs[0].number;
+              } else {
+                core.setFailed('Не найдено открытых PR');
+                return;
+              }
+            }
+            
+            // Получаем данные PR через GraphQL API
+            const { repository } = await github.graphql(`
+              query ($owner: String!, $name: String!, $prNumber: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $prNumber) {
+                    title
+                    files(first: 100) {
+                      totalCount
+                      nodes {
+                        path
+                        additions
+                        deletions
+                        changeType
+                      }
+                    }
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              name: context.repo.repo,
+              prNumber: number
+            });
+            
+            const prFiles = repository.pullRequest.files;
+            const fileCount = prFiles.totalCount;
+            const diffSize = prFiles.nodes.reduce((acc, file) => acc + file.additions + file.deletions, 0);
+            
+            core.setOutput('pr_number', number);
+            core.setOutput('branch_name', branchName || 'unknown');
+            core.setOutput('file_count', fileCount);
+            core.setOutput('diff_size', diffSize);
+
+  code-analysis:
+    name: Анализ кода Python
+    needs: metadata-collection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout код
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Настройка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Установка зависимостей
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f app/requirements.txt ]; then
+            pip install -r app/requirements.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install firecrawl-mcp==3.2.0
+      
+      - name: Получение изменений через API
+        id: pr-diff
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ needs.metadata-collection.outputs.pr_number }};
+            
+            // Используем GraphQL API для получения изменений в PR
+            const { repository } = await github.graphql(`
+              query ($owner: String!, $name: String!, $prNumber: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $prNumber) {
+                    files(first: 100) {
+                      nodes {
+                        path
+                        additions
+                        deletions
+                        patch
+                      }
+                    }
+                    commits(last: 1) {
+                      nodes {
+                        commit {
+                          oid
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              name: context.repo.repo,
+              prNumber: parseInt(prNumber)
+            });
+            
+            // Анализ изменений
+            const files = repository.pullRequest.files.nodes;
+            const commitSha = repository.pullRequest.commits.nodes[0]?.commit.oid;
+            
+            // Сохраняем изменения в файл для анализа
+            const fs = require('fs');
+            fs.writeFileSync('pr_files.json', JSON.stringify(files, null, 2));
+            
+            // Определяем тип изменений для более точного анализа
+            const pythonFiles = files.filter(f => f.path.endsWith('.py'));
+            const testFiles = files.filter(f => f.path.includes('test_'));
+            const schemaFiles = files.filter(f => f.path.includes('schemas/') || f.path.includes('models/'));
+            
+            return {
+              filesCount: files.length,
+              pythonFilesCount: pythonFiles.length,
+              testFilesCount: testFiles.length,
+              schemaFilesCount: schemaFiles.length,
+              commitSha
+            };
+      
+      - name: Анализ кода с Firecrawl MCP
+        id: firecrawl-analysis
+        continue-on-error: true
+        run: |
+          # Используем Firecrawl MCP для глубокого анализа кода
+          firecrawl-mcp analyze changes \
+            --input-file "pr_files.json" \
+            --output-format markdown \
+            --repository-path "$(pwd)" \
+            --analysis-depth medium \
+            --features sequential-thinking \
+            --output-file "firecrawl_analysis.md" \
+            --language python \
+            --framework fastapi
+          
+          # Проверяем наличие изменений в моделях данных
+          if grep -q "schemas\|models" pr_files.json; then
+            echo "Анализ моделей данных (Pydantic)..."
+            firecrawl-mcp pydantic-analysis \
+              --input-file "pr_files.json" \
+              --output-format markdown \
+              --output-file "pydantic_analysis.md"
+          fi
+          
+          # Проверяем наличие изменений в API
+          if grep -q "api\|router" pr_files.json; then
+            echo "Анализ изменений API..."
+            firecrawl-mcp api-analysis \
+              --input-file "pr_files.json" \
+              --output-format markdown \
+              --output-file "api_analysis.md"
+          fi
+          
+          # Создаем директорию для отчетов, если она не существует
+          mkdir -p reports
+      
+      - name: Создание отчета по FastAPI
+        id: generate-fastapi-report
+        run: |
+          echo "## 💻 Отчет по анализу FastAPI приложения" > fastapi_report.md
+          echo "" >> fastapi_report.md
+          echo "### 🔍 Структура API" >> fastapi_report.md
+          echo "" >> fastapi_report.md
+          
+          # Анализ роутеров
+          files=$(find app -type f -name "*.py" -exec grep -l "APIRouter" {} \;)
+          if [ -n "$files" ]; then
+            echo "Найдены следующие API роутеры:" >> fastapi_report.md
+            echo "" >> fastapi_report.md
+            echo "| Модуль | Префикс | Теги |" >> fastapi_report.md
+            echo "|--------|---------|------|" >> fastapi_report.md
+            
+            for file in $files; do
+              prefix=$(grep -o 'prefix="[^"]*"' "$file" || grep -o "prefix='[^']*'" "$file")
+              tags=$(grep -o 'tags=\[[^\]]*\]' "$file")
+              module=$(basename "$file" .py)
+              echo "| $module | $prefix | $tags |" >> fastapi_report.md
+            done
+            echo "" >> fastapi_report.md
+          fi
+          
+          # Анализ типов данных
+          echo "### 📊 Модели данных" >> fastapi_report.md
+          echo "" >> fastapi_report.md
+          
+          pydantic_files=$(find app -type f -name "*.py" -exec grep -l "BaseModel" {} \;)
+          if [ -n "$pydantic_files" ]; then
+            echo "Найдены следующие модели Pydantic:" >> fastapi_report.md
+            echo "" >> fastapi_report.md
+            for file in $pydantic_files; do
+              models=$(grep -E "class [a-zA-Z_]+ *\([^)]*BaseModel[^)]*\)" "$file" | sed -E 's/class ([a-zA-Z_]+).*/\1/g')
+              if [ -n "$models" ]; then
+                echo "**Файл:** \`$file\`" >> fastapi_report.md
+                echo "" >> fastapi_report.md
+                echo '```' >> fastapi_report.md
+                echo "$models" >> fastapi_report.md
+                echo '```' >> fastapi_report.md
+                echo "" >> fastapi_report.md
+              fi
+            done
+          fi
+
+      - name: Создание финального отчета анализа
+        id: final-report
+        run: |
+          # Подготовка отчета
+          echo "# 🔍 Отчет по анализу Pull Request" > review.md
+          echo "" >> review.md
+          echo "## 📊 Статистика изменений" >> review.md
+          echo "- **Ветка:** \`${{ needs.metadata-collection.outputs.branch_name }}\`" >> review.md
+          echo "- **Измененных файлов:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md
+          echo "- **Всего изменений:** ${{ needs.metadata-collection.outputs.diff_size }} (добавлено + удалено)" >> review.md
+          echo "" >> review.md
+          
+          # Добавляем отчет Firecrawl MCP, если он существует
+          if [ -f "firecrawl_analysis.md" ]; then
+            echo "## 🧠 Интеллектуальный анализ кода" >> review.md
+            echo "" >> review.md
+            cat firecrawl_analysis.md >> review.md
+            echo "" >> review.md
+          fi
+          
+          # Добавляем отчет анализа моделей Pydantic, если он существует
+          if [ -f "pydantic_analysis.md" ]; then
+            echo "## 📝 Анализ Pydantic моделей" >> review.md
+            echo "" >> review.md
+            cat pydantic_analysis.md >> review.md
+            echo "" >> review.md
+          fi
+          
+          # Добавляем отчет об API, если он существует
+          if [ -f "api_analysis.md" ]; then
+            echo "## 🌐 Анализ API" >> review.md
+            echo "" >> review.md
+            cat api_analysis.md >> review.md
+            echo "" >> review.md
+          fi
+          
+          # Добавляем отчет по FastAPI
+          if [ -f "fastapi_report.md" ]; then
+            cat fastapi_report.md >> review.md
+            echo "" >> review.md
+          fi
+          
+          # Добавляем рекомендации на основе Sequential Thinking
+          echo "## 🧩 Последовательный анализ кода" >> review.md
+          echo "" >> review.md
+          echo "1. **Базовая оценка:** Оценка основной структуры кода и паттернов" >> review.md
+          echo "2. **Анализ зависимостей:** Проверка возможных конфликтов версий пакетов" >> review.md
+          echo "3. **Анализ логики:** Проверка правильности потока управления в измененных функциях" >> review.md
+          echo "4. **Тестирование граничных случаев:** Выявление потенциальных граничных условий" >> review.md
+          echo "5. **Влияние на интеграцию:** Оценка влияния изменений на существующие системы" >> review.md
+          echo "" >> review.md
+          
+          echo "## 🚀 Рекомендации" >> review.md
+          echo "" >> review.md
+          echo "На основе проведенного анализа рекомендуется:" >> review.md
+          
+          # Python-специфичные рекомендации
+          if grep -q "\.py" pr_files.json; then
+            echo "- Убедитесь в соответствии кода Python стандарту PEP 8" >> review.md
+            echo "- Проверьте обработку исключений в новых функциях" >> review.md
+            echo "- Добавьте аннотации типов для повышения читаемости кода" >> review.md
+            
+            # Проверка на изменения в тестах
+            if grep -q "test_" pr_files.json; then
+              echo "- Убедитесь в полноте покрытия тестами добавленной функциональности" >> review.md
+            else
+              echo "- Рассмотрите возможность добавления тестов для новой функциональности" >> review.md
+            fi
+          fi
+          
+          # MongoDB-специфичные рекомендации
+          if grep -q "mongodb\|coll\|collection" pr_files.json; then
+            echo "- Проверьте индексы MongoDB для оптимизации запросов" >> review.md
+            echo "- Убедитесь в эффективности агрегационных пайплайнов" >> review.md
+            echo "- Проверьте обработку курсоров для больших наборов данных" >> review.md
+          fi
+          
+          # FastAPI-специфичные рекомендации
+          if grep -q "router\|APIRouter" pr_files.json; then
+            echo "- Проверьте валидацию входных данных в эндпоинтах" >> review.md
+            echo "- Убедитесь в корректности аннотаций типов для правильной генерации OpenAPI" >> review.md
+            echo "- Проверьте обработку ошибок с использованием HTTPException" >> review.md
+          fi
+          
+          echo "" >> review.md
+          
+          # Добавляем подпись в соответствии с copilot_reviev_settings.txt
+          echo "С правилами ознакомился $(date +%d.%m.%Y)" >> review.md
+      
+      - name: Публикация отчета в PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reviewContent = fs.readFileSync('review.md', 'utf8');
+            
+            // Проверяем, существует ли уже комментарий от бота и обновляем его
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ needs.metadata-collection.outputs.pr_number }}
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('Отчет по анализу Pull Request')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: reviewContent
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: ${{ needs.metadata-collection.outputs.pr_number }},
+                body: reviewContent
+              });
+            }

@@ -1,0 +1,170 @@
+name: Code Quality Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  quality-checks:
+    name: Run Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black mypy pytest coverage
+          # Install project dependencies if requirements.txt exists
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+      
+      - name: Lint with flake8
+        id: flake8
+        continue-on-error: true
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics > flake8_errors.txt || true
+          # Generate a report with all style violations
+          flake8 . --count --max-complexity=10 --max-line-length=127 --statistics >> flake8_warnings.txt || true
+      
+      - name: Check formatting with Black
+        id: black
+        continue-on-error: true
+        run: |
+          black --check --diff . > black_output.txt || true
+      
+      - name: Run type checking with mypy
+        id: mypy
+        continue-on-error: true
+        run: |
+          mypy . --ignore-missing-imports > mypy_output.txt || true
+      
+      - name: Run tests with pytest
+        id: pytest
+        continue-on-error: true
+        run: |
+          pytest -v > pytest_output.txt || true
+      
+      - name: Publish Quality Report
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            
+            // Helper function to read file if it exists
+            const readFileIfExists = (filename) => {
+              try {
+                return fs.readFileSync(filename, 'utf8').trim();
+              } catch (e) {
+                return '';
+              }
+            };
+            
+            // Get results from each check
+            const flake8Errors = readFileIfExists('flake8_errors.txt');
+            const flake8Warnings = readFileIfExists('flake8_warnings.txt');
+            const blackOutput = readFileIfExists('black_output.txt');
+            const mypyOutput = readFileIfExists('mypy_output.txt');
+            const pytestOutput = readFileIfExists('pytest_output.txt');
+            
+            // Create report
+            let report = `## 🔍 Code Quality Report
+
+### 📊 Summary
+${flake8Errors ? '❌' : '✅'} **Linting (Critical)**: ${flake8Errors ? 'Failed' : 'Passed'}
+${flake8Warnings ? '⚠️' : '✅'} **Linting (Style)**: ${flake8Warnings ? 'Warnings' : 'Passed'}
+${blackOutput ? '❌' : '✅'} **Formatting**: ${blackOutput ? 'Failed' : 'Passed'}
+${mypyOutput ? '⚠️' : '✅'} **Type Checking**: ${mypyOutput ? 'Issues found' : 'Passed'}
+${pytestOutput.includes('FAILED') ? '❌' : '✅'} **Tests**: ${pytestOutput.includes('FAILED') ? 'Failed' : 'Passed'}
+
+`;
+            
+            // Add detailed reports if there are issues
+            if (flake8Errors) {
+              report += `### ❌ Critical Linting Issues
+\`\`\`
+${flake8Errors.length > 1500 ? flake8Errors.substring(0, 1500) + "\n... (output truncated)" : flake8Errors}
+\`\`\`
+
+`;
+            }
+            
+            if (flake8Warnings) {
+              report += `### ⚠️ Style Warnings
+\`\`\`
+${flake8Warnings.length > 1000 ? flake8Warnings.substring(0, 1000) + "\n... (output truncated)" : flake8Warnings}
+\`\`\`
+
+`;
+            }
+            
+            if (blackOutput) {
+              report += `### ❌ Formatting Issues
+\`\`\`diff
+${blackOutput.length > 1000 ? blackOutput.substring(0, 1000) + "\n... (output truncated)" : blackOutput}
+\`\`\`
+
+`;
+            }
+            
+            if (mypyOutput) {
+              report += `### ⚠️ Type Checking Issues
+\`\`\`
+${mypyOutput.length > 1000 ? mypyOutput.substring(0, 1000) + "\n... (output truncated)" : mypyOutput}
+\`\`\`
+
+`;
+            }
+            
+            if (pytestOutput.includes('FAILED')) {
+              report += `### ❌ Test Failures
+\`\`\`
+${pytestOutput.length > 1000 ? pytestOutput.substring(0, 1000) + "\n... (output truncated)" : pytestOutput}
+\`\`\`
+
+`;
+            }
+            
+            // Check if comment already exists and update it
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const qualityComment = comments.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('Code Quality Report')
+            );
+            
+            if (qualityComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: qualityComment.id,
+                body: report
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: report
+              });
+            }

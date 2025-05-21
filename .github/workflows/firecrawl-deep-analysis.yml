@@ -1,0 +1,217 @@
+name: Firecrawl MCP Deep Analysis
+
+on:
+  workflow_run:
+    workflows: ["Advanced PR Analysis (2025 Edition)"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to analyze'
+        required: true
+        type: integer
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  firecrawl-analysis:
+    name: Deep Code Analysis with Firecrawl MCP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Get PR details
+        id: pr-details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Determine PR number from event context or input
+            let prNumber;
+            if (context.payload.workflow_run) {
+              // This was triggered by workflow_run
+              const run = context.payload.workflow_run;
+              const prInfo = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: run.head_sha
+              });
+              
+              if (prInfo.data.length > 0) {
+                prNumber = prInfo.data[0].number;
+              } else {
+                core.setFailed('Could not find associated PR');
+                return;
+              }
+            } else {
+              // This was triggered by workflow_dispatch
+              prNumber = context.payload.inputs.pr_number;
+            }
+            
+            core.setOutput('pr_number', prNumber);
+            return { prNumber };
+      
+      - name: Setup Firecrawl MCP v3
+        uses: firecrawl/setup-mcp@v3
+        with:
+          version: '3.2.0'
+          features: 'full'
+      
+      - name: Get PR changes
+        id: get-changes
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.pr-details.outputs.pr_number }};
+            
+            // Get PR diff using GraphQL for efficiency
+            const { repository } = await github.graphql(`
+              query ($owner: String!, $name: String!, $prNumber: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $prNumber) {
+                    files(first: 100) {
+                      nodes {
+                        path
+                        additions
+                        deletions
+                        patch
+                      }
+                    }
+                    title
+                    body
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              name: context.repo.repo,
+              prNumber: parseInt(prNumber)
+            });
+            
+            const prData = repository.pullRequest;
+            const fs = require('fs');
+            
+            // Write files data to file for processing
+            fs.writeFileSync('pr_files.json', JSON.stringify(prData.files.nodes, null, 2));
+            
+            // Write PR metadata
+            const metadata = {
+              title: prData.title,
+              body: prData.body,
+              number: prNumber
+            };
+            fs.writeFileSync('pr_metadata.json', JSON.stringify(metadata, null, 2));
+            
+            return {
+              filesCount: prData.files.nodes.length,
+              title: prData.title
+            };
+      
+      - name: Run Firecrawl MCP with Sequential Thinking
+        id: firecrawl-seq-thinking
+        run: |
+          # Execute deep analysis with Sequential Thinking
+          firecrawl-mcp analyze \
+            --input-file "pr_files.json" \
+            --metadata-file "pr_metadata.json" \
+            --repository-path "$(pwd)" \
+            --analysis-mode deep \
+            --sequential-thinking-steps 5 \
+            --output-format markdown \
+            --output-file "sequential_analysis.md"
+          
+          # Check if sequential_analysis.md was created successfully
+          if [ ! -f "sequential_analysis.md" ]; then
+            echo "Error: sequential_analysis.md was not created"
+            exit 1
+          fi
+      
+      - name: Run Contextual Change Analysis
+        id: contextual-analysis
+        run: |
+          # Run contextual dependency analysis
+          firecrawl-mcp analyze-context \
+            --input-file "pr_files.json" \
+            --repository-path "$(pwd)" \
+            --depth 3 \
+            --include-dependencies \
+            --output-format markdown \
+            --output-file "context_analysis.md"
+      
+      - name: Generate Coherence Report
+        id: generate-coherence
+        run: |
+          # Generate coherence report that analyzes logical consistency
+          firecrawl-mcp analyze-coherence \
+            --input-file "pr_files.json" \
+            --repository-path "$(pwd)" \
+            --sequential-output "sequential_analysis.md" \
+            --context-output "context_analysis.md" \
+            --output-format markdown \
+            --output-file "coherence_report.md"
+      
+      - name: Create Final Deep Analysis Report
+        id: create-report
+        run: |
+          # Combine all reports into one comprehensive analysis
+          cat > "deep_analysis.md" << EOL
+          # 🔬 Firecrawl MCP Deep Analysis Report
+          
+          ## 🧠 Sequential Thinking Analysis
+          
+          $(cat sequential_analysis.md)
+          
+          ## 🌐 Contextual Change Analysis
+          
+          $(cat context_analysis.md)
+          
+          ## 🧩 Code Coherence Evaluation
+          
+          $(cat coherence_report.md)
+          
+          ## 🚀 Recommendations
+          
+          Based on the deep analysis performed by Firecrawl MCP with Sequential Thinking:
+          
+          1. **Architecture Considerations:** $(grep -A 3 "Architecture" sequential_analysis.md | tail -n +2 | head -n 1)
+          
+          2. **Performance Impacts:** $(grep -A 3 "Performance" sequential_analysis.md | tail -n +2 | head -n 1)
+          
+          3. **Maintainability Score:** $(grep -A 2 "Maintainability" coherence_report.md | tail -n +2 | head -n 1)
+          
+          4. **Next Steps:** Continue development while addressing the points highlighted in this analysis.
+          EOL
+      
+      - name: Post Analysis to PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const analysisContent = fs.readFileSync('deep_analysis.md', 'utf8');
+            
+            // Keep the report within GitHub's comment size limits
+            const maxSize = 65000;
+            let finalReport = analysisContent;
+            
+            if (analysisContent.length > maxSize) {
+              finalReport = analysisContent.substring(0, maxSize) + 
+                "\n\n⚠️ *This report was truncated due to size limitations. See workflow logs for complete analysis.*";
+            }
+            
+            // Add a header with timestamp
+            const header = `# 🔬 Firecrawl MCP Deep Analysis (${new Date().toISOString()})`;
+            finalReport = header + "\n\n" + finalReport;
+            
+            // Post comment to PR
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr-details.outputs.pr_number }},
+              body: finalReport
+            });

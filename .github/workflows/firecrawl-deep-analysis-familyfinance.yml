@@ -1,0 +1,287 @@
+name: Глубокий анализ кода с Firecrawl MCP
+
+on:
+  workflow_run:
+    workflows: ["Анализ Pull Request (Май 2025)"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Номер PR для анализа'
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  firecrawl-deep-analysis:
+    name: Глубокий анализ кода с Firecrawl MCP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout код
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Получение данных PR
+        id: pr-details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Определяем номер PR из контекста события или входных данных
+            let prNumber;
+            if (context.payload.workflow_run) {
+              // Запущено через workflow_run
+              const run = context.payload.workflow_run;
+              const prInfo = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: run.head_sha
+              });
+              
+              if (prInfo.data.length > 0) {
+                prNumber = prInfo.data[0].number;
+              } else {
+                core.setFailed('Не удалось найти связанный PR');
+                return;
+              }
+            } else {
+              // Запущено через workflow_dispatch
+              prNumber = context.payload.inputs.pr_number;
+            }
+            
+            core.setOutput('pr_number', prNumber);
+            return { prNumber };
+      
+      - name: Настройка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Установка Firecrawl MCP
+        run: |
+          python -m pip install --upgrade pip
+          pip install firecrawl-mcp==3.2.0
+          
+          # Устанавливаем зависимости проекта
+          if [ -f app/requirements.txt ]; then
+            pip install -r app/requirements.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+      
+      - name: Получение изменений PR
+        id: get-changes
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.pr-details.outputs.pr_number }};
+            
+            // Получаем изменения PR используя GraphQL для эффективности
+            const { repository } = await github.graphql(`
+              query ($owner: String!, $name: String!, $prNumber: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $prNumber) {
+                    files(first: 100) {
+                      nodes {
+                        path
+                        additions
+                        deletions
+                        patch
+                      }
+                    }
+                    title
+                    body
+                    headRefOid
+                    baseRefOid
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              name: context.repo.repo,
+              prNumber: parseInt(prNumber)
+            });
+            
+            const prData = repository.pullRequest;
+            const fs = require('fs');
+            
+            // Записываем данные в файлы для обработки
+            fs.writeFileSync('pr_files.json', JSON.stringify(prData.files.nodes, null, 2));
+            
+            // Записываем метаданные PR
+            const metadata = {
+              title: prData.title,
+              body: prData.body,
+              number: prNumber,
+              headCommit: prData.headRefOid,
+              baseCommit: prData.baseRefOid
+            };
+            fs.writeFileSync('pr_metadata.json', JSON.stringify(metadata, null, 2));
+            
+            return {
+              filesCount: prData.files.nodes.length,
+              title: prData.title,
+              headCommit: prData.headRefOid,
+              baseCommit: prData.baseRefOid
+            };
+      
+      - name: Запуск Firecrawl MCP с Sequential Thinking
+        id: firecrawl-seq-thinking
+        run: |
+          # Выполняем глубокий анализ с последовательным мышлением
+          firecrawl-mcp analyze \
+            --input-file "pr_files.json" \
+            --metadata-file "pr_metadata.json" \
+            --repository-path "$(pwd)" \
+            --analysis-mode deep \
+            --sequential-thinking-steps 5 \
+            --output-format markdown \
+            --output-file "sequential_analysis.md" \
+            --language python \
+            --framework fastapi
+          
+          # Проверяем, что файл sequential_analysis.md был успешно создан
+          if [ ! -f "sequential_analysis.md" ]; then
+            echo "Ошибка: sequential_analysis.md не был создан"
+            exit 1
+          fi
+      
+      - name: Анализ контекста изменений
+        id: contextual-analysis
+        run: |
+          # Анализируем контекст и зависимости
+          firecrawl-mcp analyze-context \
+            --input-file "pr_files.json" \
+            --repository-path "$(pwd)" \
+            --depth 3 \
+            --include-dependencies \
+            --output-format markdown \
+            --output-file "context_analysis.md" \
+            --language python
+      
+      - name: Специализированный анализ FastAPI & MongoDB
+        id: specialized-analysis
+        run: |
+          # Анализ FastAPI компонентов
+          if grep -q "router\|APIRouter" pr_files.json; then
+            firecrawl-mcp analyze-fastapi \
+              --input-file "pr_files.json" \
+              --repository-path "$(pwd)" \
+              --output-format markdown \
+              --output-file "fastapi_analysis.md"
+          fi
+          
+          # Анализ MongoDB запросов
+          if grep -q "mongodb\|collection\|coll(" pr_files.json; then
+            firecrawl-mcp analyze-mongodb \
+              --input-file "pr_files.json" \
+              --repository-path "$(pwd)" \
+              --output-format markdown \
+              --output-file "mongodb_analysis.md"
+          fi
+      
+      - name: Генерация отчета о согласованности
+        id: generate-coherence
+        run: |
+          # Генерация отчета о согласованности, анализирующего логическую непротиворечивость
+          firecrawl-mcp analyze-coherence \
+            --input-file "pr_files.json" \
+            --repository-path "$(pwd)" \
+            --sequential-output "sequential_analysis.md" \
+            --context-output "context_analysis.md" \
+            --output-format markdown \
+            --output-file "coherence_report.md"
+      
+      - name: Создание финального отчета глубокого анализа
+        id: create-report
+        run: |
+          # Объединение всех отчетов в один комплексный анализ
+          cat > "deep_analysis.md" << EOL
+          # 🔬 Отчет глубокого анализа с Firecrawl MCP
+          
+          ## 🧠 Анализ с последовательным мышлением (Sequential Thinking)
+          
+          $(cat sequential_analysis.md)
+          
+          ## 🌐 Анализ контекста изменений
+          
+          $(cat context_analysis.md)
+          
+          ## 🧩 Оценка согласованности кода
+          
+          $(cat coherence_report.md)
+          
+          ## 📊 Специализированный анализ
+          EOL
+          
+          # Добавляем результаты специализированного анализа FastAPI, если они существуют
+          if [ -f "fastapi_analysis.md" ]; then
+            cat >> "deep_analysis.md" << EOL
+          
+          ### FastAPI компоненты
+          
+          $(cat fastapi_analysis.md)
+          EOL
+          fi
+          
+          # Добавляем результаты специализированного анализа MongoDB, если они существуют
+          if [ -f "mongodb_analysis.md" ]; then
+            cat >> "deep_analysis.md" << EOL
+          
+          ### MongoDB запросы и оптимизация
+          
+          $(cat mongodb_analysis.md)
+          EOL
+          fi
+          
+          # Добавляем рекомендации
+          cat >> "deep_analysis.md" << EOL
+          
+          ## 🚀 Рекомендации
+          
+          На основе глубокого анализа, проведенного Firecrawl MCP с использованием Sequential Thinking:
+          
+          1. **Архитектурные аспекты:** $(grep -A 3 "Архитектура\|Architecture" sequential_analysis.md | grep -v "Архитектура\|Architecture" | head -n 1 || echo "Не обнаружено значительных архитектурных проблем.")
+          
+          2. **Влияние на производительность:** $(grep -A 3 "Производительность\|Performance" sequential_analysis.md | grep -v "Производительность\|Performance" | head -n 1 || echo "Не обнаружено значительного влияния на производительность.")
+          
+          3. **Оценка поддерживаемости:** $(grep -A 2 "Поддерживаемость\|Maintainability" coherence_report.md | grep -v "Поддерживаемость\|Maintainability" | head -n 1 || echo "Код соответствует стандартам поддерживаемости.")
+          
+          4. **Следующие шаги:** Продолжайте разработку, учитывая моменты, выделенные в этом анализе.
+          
+          С правилами ознакомился $(date +%d.%m.%Y)
+          EOL
+      
+      - name: Публикация анализа в PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const analysisContent = fs.readFileSync('deep_analysis.md', 'utf8');
+            
+            // Ограничиваем размер отчета (GitHub имеет ограничения на размер комментария)
+            const maxSize = 65000;
+            let finalReport = analysisContent;
+            
+            if (analysisContent.length > maxSize) {
+              finalReport = analysisContent.substring(0, maxSize) + 
+                "\n\n⚠️ *Этот отчет был сокращен из-за ограничений размера. Полный анализ доступен в логах workflow.*";
+            }
+            
+            // Добавляем заголовок с временной меткой
+            const header = `# 🔬 Глубокий анализ с Firecrawl MCP (${new Date().toISOString().split('T')[0]})`;
+            finalReport = header + "\n\n" + finalReport;
+            
+            // Публикуем комментарий в PR
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr-details.outputs.pr_number }},
+              body: finalReport
+            });
