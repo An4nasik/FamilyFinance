@@ -1,0 +1,30 @@
+name: Code Review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    
+jobs:
+  call-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call AI model
+        env:
+          GITHUB_TOKEN: "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"
+        run: |
+          curl "https://models.github.ai/inference/chat/completions" \
+             -H "Content-Type: application/json" \
+             -H "Authorization: Bearer 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" \
+             -d '{
+              "messages": [
+                  {
+                     "role": "user",
+                     "content": "Explain the concept of recursion."
+                  }
+               ],
+               "model": "openai/gpt-4o"
+            }'
