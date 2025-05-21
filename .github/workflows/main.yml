@@ -5,8 +5,9 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  models: read
+  contents: read
   pull-requests: write
+  models: read
 
 jobs:
   ai-review:
@@ -15,6 +16,9 @@ jobs:
       - name: Checkout PR code
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get PR Diff
