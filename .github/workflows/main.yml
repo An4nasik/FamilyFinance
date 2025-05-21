@@ -14,16 +14,16 @@ jobs:
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
-          - name: Get PR Diff
+        
+      - name: Get PR Diff
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Получаем diff напрямую из API с правильным Accept header
           curl -s -H "Accept: application/vnd.github.v3.diff" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" > pr_diff.txt
-          
-          # Проверяем статус команды curl
+            # Проверяем статус команды curl
           CURL_STATUS=$?
           if [ $CURL_STATUS -ne 0 ]; then
             echo "Ошибка при выполнении curl: код $CURL_STATUS"
@@ -34,22 +34,18 @@ jobs:
           if [[ ! -s pr_diff.txt ]]; then
             echo "Ошибка: Файл pr_diff.txt пустой или отсутствует"
             
-            # Попробуем другой метод - через API с использованием jq для извлечения patch
-            echo "Пробуем альтернативный метод получения diff..."
-            curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" > pr_info.json
+            # Получаем список файлов, измененных в PR - другой метод
+            echo "Пробуем альтернативный метод получения изменений..."
+            curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" > pr_files.json
             
-            if [ -s pr_info.json ]; then
-              # Получаем список файлов, измененных в PR
-              curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" > pr_files.json
-              
+            if [ -s pr_files.json ]; then
               # Создаем простой diff формат для обработки
               echo "Создан синтетический diff из списка измененных файлов" > pr_diff.txt
               jq -r '.[] | "Файл: \(.filename)\nИзменения: +\(.additions) -\(.deletions)\n\(.patch // "Нет доступного патча")\n"' pr_files.json >> pr_diff.txt
             else
-              echo "Не удалось получить информацию о PR"
-              exit 1
+              echo "Не удалось получить информацию о PR. Создаем пустой отчет."
+              echo "Не удалось получить данные о изменениях в PR." > pr_diff.txt
             fi
           fi
 
@@ -59,7 +55,7 @@ jobs:
             - name: Generate Code Review
         run: |
           # Создаем файл с обзором по умолчанию
-          echo "## Автоматический обзор кода\n\nФайл diff был успешно получен и проанализирован." > review.txt
+          echo -e "## Автоматический обзор кода\n\nФайл diff был успешно получен и проанализирован." > review.txt
           
           # Генерируем обзор на основе diff файла
           if [ -s pr_diff.txt ]; then
@@ -67,49 +63,57 @@ jobs:
             head -c 50000 pr_diff.txt > pr_diff_limited.txt
             
             # Базовый анализ изменений
-            echo "## Автоматический обзор кода\n" > review.txt
-            echo "### Обзор изменений\n" >> review.txt
+            echo -e "## Автоматический обзор кода\n" > review.txt
+            echo -e "### Обзор изменений\n" >> review.txt
             
             # Подсчет измененных файлов и строк
             FILES_CHANGED=$(grep -c "^Файл: " pr_diff.txt || echo "0")
-            LINES_ADDED=$(grep -o "+[^+]" pr_diff.txt | wc -l)
-            LINES_REMOVED=$(grep -o "-[^-]" pr_diff.txt | wc -l)
+            LINES_ADDED=$(grep -o "+[^+]" pr_diff.txt | wc -l || echo "0")
+            LINES_REMOVED=$(grep -o "-[^-]" pr_diff.txt | wc -l || echo "0")
             
-            echo "- Изменено файлов: примерно $FILES_CHANGED" >> review.txt
-            echo "- Добавлено строк: примерно $LINES_ADDED" >> review.txt
-            echo "- Удалено строк: примерно $LINES_REMOVED\n" >> review.txt
+            echo -e "- Изменено файлов: примерно $FILES_CHANGED" >> review.txt
+            echo -e "- Добавлено строк: примерно $LINES_ADDED" >> review.txt
+            echo -e "- Удалено строк: примерно $LINES_REMOVED\n" >> review.txt
             
-            # Анализ кода на языке Python, если это Python-файлы
+            # Анализ типов файлов
             if grep -q "\.py" pr_diff.txt; then
-              echo "### Анализ кода Python\n" >> review.txt
-              echo "Обнаружены изменения в Python-файлах. Рекомендуется проверить:\n" >> review.txt
-              echo "- Соответствие стилю кода PEP 8" >> review.txt
-              echo "- Наличие комментариев к сложным участкам кода" >> review.txt
-              echo "- Обработку потенциальных исключений" >> review.txt
-              echo "- Проведение модульного тестирования для новой функциональности\n" >> review.txt
+              echo -e "### Анализ кода Python\n" >> review.txt
+              echo -e "Обнаружены изменения в Python-файлах. Рекомендуется проверить:\n" >> review.txt
+              echo -e "- Соответствие стилю кода PEP 8" >> review.txt
+              echo -e "- Наличие комментариев к сложным участкам кода" >> review.txt
+              echo -e "- Обработку потенциальных исключений" >> review.txt
+              echo -e "- Проведение модульного тестирования для новой функциональности\n" >> review.txt
             fi
             
-            echo "### Итоги\n" >> review.txt
-            echo "Пожалуйста, убедитесь, что код соответствует стандартам проекта и прошел необходимое тестирование перед слиянием.\n" >> review.txt
+            if grep -q "\.md" pr_diff.txt; then
+              echo -e "### Анализ документации\n" >> review.txt
+              echo -e "Обнаружены изменения в Markdown-файлах. Рекомендации:\n" >> review.txt
+              echo -e "- Проверьте форматирование документации" >> review.txt
+              echo -e "- Убедитесь в актуальности информации" >> review.txt
+              echo -e "- Проверьте ссылки на корректность\n" >> review.txt
+            fi
+            
+            echo -e "### Итоги\n" >> review.txt
+            echo -e "Пожалуйста, убедитесь, что код соответствует стандартам проекта и прошел необходимое тестирование перед слиянием.\n" >> review.txt
           else
-            echo "## Автоматический обзор кода\n\nНе удалось проанализировать изменения. Файл diff пуст или недоступен." > review.txt
+            echo -e "## Автоматический обзор кода\n\nНе удалось проанализировать изменения. Файл diff пуст или недоступен." > review.txt
           fi
           
           # Выводим содержимое обзора для отладки
           echo "Содержимое review.txt:"
           cat review.txt
-          
-      - name: Post Review as PR Comment
+            - name: Post Review as PR Comment
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Подготовка содержимого комментария (экранирование спецсимволов)
-          COMMENT=$(cat review.txt)
+          COMMENT=$(cat review.txt || echo "## Автоматический обзор кода\n\nНе удалось сгенерировать обзор кода.")
           PR_NUMBER=${{ github.event.pull_request.number }}
           REPO=${{ github.repository }}
           
           # Создаем временный JSON файл для тела запроса
-          echo "{\"body\": $(jq -Rs . <review.txt)}" > comment_payload.json
+          echo "{\"body\": $(jq -Rs . <review.txt || echo '## Автоматический обзор кода\n\nНе удалось сгенерировать обзор кода.')}" > comment_payload.json
           
           # Отправляем комментарий в PR
           curl -s -H "Authorization: token $GITHUB_TOKEN" \
