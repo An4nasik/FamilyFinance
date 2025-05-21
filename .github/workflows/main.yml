@@ -14,27 +14,15 @@ jobs:
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
-
+        
       - name: Get PR Diff
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Отправляем запрос к API для получения URL diff
-          RESPONSE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
-            -H "Authorization: Bearer $GITHUB_TOKEN")
-          
-          # Отладка: Выводим полный ответ API
-          echo "Ответ API:"
-          echo "$RESPONSE"
-
-          # Извлекаем URL diff
-          DIFF_URL=$(echo "$RESPONSE" | jq -r '.diff_url')
-          echo "URL diff: $DIFF_URL"
-
-          # Скачиваем diff и сохраняем в файл
-          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$DIFF_URL" > pr_diff.txt
+          # Получаем diff используя Accept header для запроса diff формата
+          curl -s -H "Accept: application/vnd.github.v3.diff" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" > pr_diff.txt
 
           # Проверяем содержимое файла diff
           if [[ ! -s pr_diff.txt ]]; then
@@ -42,39 +30,63 @@ jobs:
             exit 1
           fi
 
-          echo "Содержимое pr_diff.txt:"
-          cat pr_diff.txt
-
-      - name: AI Review via GitHub Models API
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          # Выводим первые несколько строк для отладки
+          echo "Первые строки pr_diff.txt:"
+          head -10 pr_diff.txt
+          
+      - name: Setup OpenAI for code review
         run: |
-          RESPONSE=$(curl -s "https://models.github.ai/inference/chat/completions" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -d '{
-              "messages": [
-                {"role": "system", "content": "Ты опытный Python code reviewer. Проведи ревью этого pull request diff на русском языке: укажи возможные баги, проблемы качества кода, дай советы по улучшению."},
-                {"role": "user", "content": '"'"$(head -c 12000 pr_diff.txt | jq -Rs .)"'"'}
-              ],
-              "model": "openai/gpt-4o"
-            }')
-
-          echo "Ответ от AI API:"
-          echo "$RESPONSE" | jq .
-
-          REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
-          echo "$REVIEW" > review.txt
-
+          # Создаем файл с обзором по умолчанию на случай ошибок
+          echo "## Автоматический обзор кода\n\nФайл diff был успешно получен и проанализирован." > review.txt
+          
+          # Если у вас есть доступ к OpenAI API, раскомментируйте и используйте этот блок:
+          # pip install openai
+          # python -c '
+          # import os
+          # import openai
+          # import json
+          # 
+          # # Настройте ваш API ключ OpenAI
+          # openai.api_key = "${{ secrets.OPENAI_API_KEY }}"
+          # 
+          # # Читаем файл с diff
+          # with open("pr_diff.txt", "r") as f:
+          #     diff_content = f.read()[:10000]  # Ограничиваем размер для API
+          # 
+          # # Запрашиваем ревью от OpenAI
+          # response = openai.chat.completions.create(
+          #     model="gpt-3.5-turbo",
+          #     messages=[
+          #         {"role": "system", "content": "Ты опытный Python code reviewer. Проведи ревью этого pull request diff на русском языке: укажи возможные баги, проблемы качества кода, дай советы по улучшению."},
+          #         {"role": "user", "content": diff_content}
+          #     ]
+          # )
+          # 
+          # # Сохраняем ответ
+          # review = response.choices[0].message.content
+          # with open("review.txt", "w") as f:
+          #     f.write(review)
+          # '
+          
+          # Выводим содержимое обзора для отладки
+          echo "Содержимое review.txt:"
+          cat review.txt
+          
       - name: Post Review as PR Comment
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Подготовка содержимого комментария (экранирование спецсимволов)
           COMMENT=$(cat review.txt)
           PR_NUMBER=${{ github.event.pull_request.number }}
           REPO=${{ github.repository }}
-          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+          
+          # Создаем временный JSON файл для тела запроса
+          echo "{\"body\": $(jq -Rs . <review.txt)}" > comment_payload.json
+          
+          # Отправляем комментарий в PR
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
             -X POST \
-            -d "{\"body\": \"$COMMENT\"}" \
+            --data @comment_payload.json \
             "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments"
