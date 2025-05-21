@@ -90,9 +90,8 @@ jobs:
     name: Анализ кода Python
     needs: metadata-collection
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout код
-        uses: actions/checkout@v5
+    steps:      - name: Checkout код
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
