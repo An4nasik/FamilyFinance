@@ -14,12 +14,19 @@ jobs:
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get PR Diff
         id: diff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr_diff.txt
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" > pr_details.json
+          jq -r '.diff_url' pr_details.json > diff_url.txt
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "$(cat diff_url.txt)" > pr_diff.txt
 
       - name: AI Review via GitHub Models API
         env:
