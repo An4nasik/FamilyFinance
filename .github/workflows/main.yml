@@ -23,7 +23,7 @@ jobs:
               "messages": [
                   {
                      "role": "user",
-                     "content": "Explain the concept of recursion."
+                     "content": "Представь что ты senior python developer. Проверь весь код на соблюдение best practises."
                   }
                ],
                "model": "openai/gpt-4o"
