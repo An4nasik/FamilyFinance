@@ -15,7 +15,8 @@ permissions:
   contents: read
   pull-requests: write
 
-jobs:  deep-code-analysis:
+jobs:
+  deep-code-analysis:
     name: Deep Code Analysis
     runs-on: ubuntu-latest
     steps:
@@ -50,10 +51,10 @@ jobs:  deep-code-analysis:
               // This was triggered by workflow_dispatch
               prNumber = context.payload.inputs.pr_number;
             }
-            
-            core.setOutput('pr_number', prNumber);
+              core.setOutput('pr_number', prNumber);
             return { prNumber };
-        # Since Firecrawl MCP is a fictional tool, we'll simulate its functionality
+      
+      # Since Firecrawl MCP is a fictional tool, we'll simulate its functionality
       - name: Setup Python for code analysis
         uses: actions/setup-python@v4
         with:
@@ -112,12 +113,12 @@ jobs:  deep-code-analysis:
               number: prNumber
             };
             fs.writeFileSync('pr_metadata.json', JSON.stringify(metadata, null, 2));
-            
-            return {
+              return {
               filesCount: prData.files.nodes.length,
               title: prData.title
             };
-        - name: Run Code Complexity Analysis
+      
+      - name: Run Code Complexity Analysis
         id: code-complexity-analysis
         run: |
           # Execute code complexity analysis with real tools
@@ -150,9 +151,9 @@ for file in py_files:
             echo "### General Recommendations:" >> sequential_analysis.md
             echo "1. Ensure code follows PEP 8 standards" >> sequential_analysis.md
             echo "2. Write comprehensive tests" >> sequential_analysis.md
-            echo "3. Document functions and classes with docstrings" >> sequential_analysis.md
-          fi
-        - name: Run Security and Dependency Analysis
+            echo "3. Document functions and classes with docstrings" >> sequential_analysis.md          fi
+      
+      - name: Run Security and Dependency Analysis
         id: security-dependency-analysis
         run: |
           # Run security analysis with Bandit
@@ -188,9 +189,9 @@ else:
             echo "### Dependencies found:" >> context_analysis.md
             cat requirements.txt >> context_analysis.md
           else
-            echo "No requirements.txt file found." >> context_analysis.md
-          fi
-        - name: Generate Code Quality Report
+            echo "No requirements.txt file found." >> context_analysis.md          fi
+      
+      - name: Generate Code Quality Report
         id: generate-quality-report
         run: |
           # Generate code quality report using real tools
@@ -247,7 +248,7 @@ else:
         run: |
           # Combine all reports into one comprehensive analysis
           cat > "deep_analysis.md" << EOL
-          # 🔬 Firecrawl MCP Deep Analysis Report
+          # 🔬 Deep Code Analysis Report
           
           ## 🧠 Sequential Thinking Analysis
           
@@ -263,7 +264,7 @@ else:
           
           ## 🚀 Recommendations
           
-          Based on the deep analysis performed by Firecrawl MCP with Sequential Thinking:
+          Based on the deep code analysis with Sequential Thinking:
           
           1. **Architecture Considerations:** $(grep -A 3 "Architecture" sequential_analysis.md | tail -n +2 | head -n 1)
           
@@ -292,7 +293,7 @@ else:
             }
             
             // Add a header with timestamp
-            const header = `# 🔬 Firecrawl MCP Deep Analysis (${new Date().toISOString()})`;
+            const header = `# 🔬 Deep Code Analysis (${new Date().toISOString()})`;
             finalReport = header + "\n\n" + finalReport;
             
             // Post comment to PR
