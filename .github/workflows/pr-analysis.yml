@@ -75,12 +75,12 @@ jobs:
     name: Advanced Code Analysis
     needs: metadata-collection
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout PR code
+    steps:      - name: Checkout PR code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-        - name: Setup Python for code analysis
+          
+      - name: Setup Python for code analysis
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
@@ -135,14 +135,14 @@ jobs:
             // Write files data to a JSON file for analysis
             const fs = require('fs');
             fs.writeFileSync('pr_files.json', JSON.stringify(files, null, 2));
-            
-            return {
+              return {
               filesCount: files.length,
               commitSha
             };
-        - name: Analyze Code
+            
+      - name: Analyze Code
         id: code-analysis
-        run: |          # Use existing code analysis tools instead of fictitious firecrawl-mcp
+        run: |          # Use Python code analysis tools
           python -c "
 import json
 import os
@@ -178,7 +178,7 @@ with open('code_analysis.md', 'w') as f:
             f.write('- Ensure consistent formatting\\n')
             f.write('- Check for duplicate code patterns\\n\\n')
 "
-            # Use bandit for security scanning instead of fictitious firecrawl-mcp
+            # Use bandit for security scanning
           python -c "
 import json
 import os
@@ -216,10 +216,10 @@ pip install bandit
           echo "" >> review.md
           echo "### 📊 Pull Request Statistics" >> review.md
           echo "- **Branch:** \`${{ needs.metadata-collection.outputs.branch_name }}\`" >> review.md
-          echo "- **Files Changed:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md
-          echo "- **Total Changes:** ${{ needs.metadata-collection.outputs.diff_size }} (additions + deletions)" >> review.md
+          echo "- **Files Changed:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md          echo "- **Total Changes:** ${{ needs.metadata-collection.outputs.diff_size }} (additions + deletions)" >> review.md
           echo "" >> review.md
-            # Add code analysis
+          
+          # Add code analysis
           echo "### 🧠 Intelligent Code Analysis" >> review.md
           echo "" >> review.md
           cat code_analysis.md >> review.md
