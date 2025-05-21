@@ -14,59 +14,86 @@ jobs:
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
-        
-      - name: Get PR Diff
+          - name: Get PR Diff
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Получаем diff используя Accept header для запроса diff формата
+          # Получаем diff напрямую из API с правильным Accept header
           curl -s -H "Accept: application/vnd.github.v3.diff" \
-            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" > pr_diff.txt
+          
+          # Проверяем статус команды curl
+          CURL_STATUS=$?
+          if [ $CURL_STATUS -ne 0 ]; then
+            echo "Ошибка при выполнении curl: код $CURL_STATUS"
+            exit 1
+          fi
 
           # Проверяем содержимое файла diff
           if [[ ! -s pr_diff.txt ]]; then
             echo "Ошибка: Файл pr_diff.txt пустой или отсутствует"
-            exit 1
+            
+            # Попробуем другой метод - через API с использованием jq для извлечения patch
+            echo "Пробуем альтернативный метод получения diff..."
+            curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" > pr_info.json
+            
+            if [ -s pr_info.json ]; then
+              # Получаем список файлов, измененных в PR
+              curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" > pr_files.json
+              
+              # Создаем простой diff формат для обработки
+              echo "Создан синтетический diff из списка измененных файлов" > pr_diff.txt
+              jq -r '.[] | "Файл: \(.filename)\nИзменения: +\(.additions) -\(.deletions)\n\(.patch // "Нет доступного патча")\n"' pr_files.json >> pr_diff.txt
+            else
+              echo "Не удалось получить информацию о PR"
+              exit 1
+            fi
           fi
 
           # Выводим первые несколько строк для отладки
           echo "Первые строки pr_diff.txt:"
           head -10 pr_diff.txt
-          
-      - name: Setup OpenAI for code review
+            - name: Generate Code Review
         run: |
-          # Создаем файл с обзором по умолчанию на случай ошибок
+          # Создаем файл с обзором по умолчанию
           echo "## Автоматический обзор кода\n\nФайл diff был успешно получен и проанализирован." > review.txt
           
-          # Если у вас есть доступ к OpenAI API, раскомментируйте и используйте этот блок:
-          # pip install openai
-          # python -c '
-          # import os
-          # import openai
-          # import json
-          # 
-          # # Настройте ваш API ключ OpenAI
-          # openai.api_key = "${{ secrets.OPENAI_API_KEY }}"
-          # 
-          # # Читаем файл с diff
-          # with open("pr_diff.txt", "r") as f:
-          #     diff_content = f.read()[:10000]  # Ограничиваем размер для API
-          # 
-          # # Запрашиваем ревью от OpenAI
-          # response = openai.chat.completions.create(
-          #     model="gpt-3.5-turbo",
-          #     messages=[
-          #         {"role": "system", "content": "Ты опытный Python code reviewer. Проведи ревью этого pull request diff на русском языке: укажи возможные баги, проблемы качества кода, дай советы по улучшению."},
-          #         {"role": "user", "content": diff_content}
-          #     ]
-          # )
-          # 
-          # # Сохраняем ответ
-          # review = response.choices[0].message.content
-          # with open("review.txt", "w") as f:
-          #     f.write(review)
-          # '
+          # Генерируем обзор на основе diff файла
+          if [ -s pr_diff.txt ]; then
+            # Ограничиваем размер diff до разумного лимита
+            head -c 50000 pr_diff.txt > pr_diff_limited.txt
+            
+            # Базовый анализ изменений
+            echo "## Автоматический обзор кода\n" > review.txt
+            echo "### Обзор изменений\n" >> review.txt
+            
+            # Подсчет измененных файлов и строк
+            FILES_CHANGED=$(grep -c "^Файл: " pr_diff.txt || echo "0")
+            LINES_ADDED=$(grep -o "+[^+]" pr_diff.txt | wc -l)
+            LINES_REMOVED=$(grep -o "-[^-]" pr_diff.txt | wc -l)
+            
+            echo "- Изменено файлов: примерно $FILES_CHANGED" >> review.txt
+            echo "- Добавлено строк: примерно $LINES_ADDED" >> review.txt
+            echo "- Удалено строк: примерно $LINES_REMOVED\n" >> review.txt
+            
+            # Анализ кода на языке Python, если это Python-файлы
+            if grep -q "\.py" pr_diff.txt; then
+              echo "### Анализ кода Python\n" >> review.txt
+              echo "Обнаружены изменения в Python-файлах. Рекомендуется проверить:\n" >> review.txt
+              echo "- Соответствие стилю кода PEP 8" >> review.txt
+              echo "- Наличие комментариев к сложным участкам кода" >> review.txt
+              echo "- Обработку потенциальных исключений" >> review.txt
+              echo "- Проведение модульного тестирования для новой функциональности\n" >> review.txt
+            fi
+            
+            echo "### Итоги\n" >> review.txt
+            echo "Пожалуйста, убедитесь, что код соответствует стандартам проекта и прошел необходимое тестирование перед слиянием.\n" >> review.txt
+          else
+            echo "## Автоматический обзор кода\n\nНе удалось проанализировать изменения. Файл diff пуст или недоступен." > review.txt
+          fi
           
           # Выводим содержимое обзора для отладки
           echo "Содержимое review.txt:"
