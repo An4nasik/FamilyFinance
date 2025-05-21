@@ -18,21 +18,19 @@ jobs:
         with:
           token: ${{ secrets.MY_GITHUB_TOKEN }}
 
-      - name: Get PR Diff
-        id: diff
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Check PR Diff File
         run: |
-          RESPONSE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
-            -H "Authorization: Bearer $GITHUB_TOKEN")
-          echo "$RESPONSE" | jq -r '.diff_url' > diff_url.txt
-          curl -s "$(cat diff_url.txt)" > pr_diff.txt
+          if [[ ! -s pr_diff.txt ]]; then
+            echo "Ошибка: Файл pr_diff.txt пустой или отсутствует"
+            exit 1
+          fi
+          cat pr_diff.txt
 
       - name: AI Review via GitHub Models API
         env:
           GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         run: |
-          REVIEW=$(curl -s "https://models.github.ai/inference/chat/completions" \
+          RESPONSE=$(curl -s "https://models.github.ai/inference/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -d '{
@@ -41,7 +39,18 @@ jobs:
                 {"role": "user", "content": '"'"$(head -c 12000 pr_diff.txt | jq -Rs .)"'"'}
               ],
               "model": "openai/gpt-4o"
-            }' | jq -r '.choices[0].message.content')
+            }')
+
+          # Отладка: Вывести ответ API
+          echo "API Response: $RESPONSE"
+
+          # Проверка валидности JSON-ответа
+          echo "$RESPONSE" | jq . || {
+            echo "Ошибка: Некорректный JSON от API"
+            exit 1
+          }
+
+          REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
           echo "$REVIEW" > review.txt
 
       - name: Post Review as PR Comment
