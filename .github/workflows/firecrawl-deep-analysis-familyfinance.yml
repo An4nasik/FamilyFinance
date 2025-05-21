@@ -56,7 +56,7 @@ jobs:
             return { prNumber };
       
       - name: Настройка Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.12'
           cache: 'pip'
