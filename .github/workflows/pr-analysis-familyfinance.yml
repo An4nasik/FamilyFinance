@@ -85,12 +85,12 @@ jobs:
             core.setOutput('branch_name', branchName || 'unknown');
             core.setOutput('file_count', fileCount);
             core.setOutput('diff_size', diffSize);
-
   code-analysis:
     name: Анализ кода Python
     needs: metadata-collection
     runs-on: ubuntu-latest
-    steps:      - name: Checkout код
+    steps:
+      - name: Checkout код
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -389,7 +389,7 @@ except Exception as e:
           echo "- **Всего изменений:** ${{ needs.metadata-collection.outputs.diff_size }} (добавлено + удалено)" >> review.md
           echo "" >> review.md
           
-          # Добавляем отчет Firecrawl MCP, если он существует
+          # Добавляем отчет глубокого анализа кода, если он существует
           if [ -f "firecrawl_analysis.md" ]; then
             echo "## 🧠 Интеллектуальный анализ кода" >> review.md
             echo "" >> review.md

@@ -15,7 +15,8 @@ permissions:
   contents: read
   pull-requests: write
 
-jobs:  deep-code-analysis:
+jobs:
+  deep-code-analysis:
     name: Глубокий анализ кода
     runs-on: ubuntu-latest
     steps:
@@ -50,8 +51,7 @@ jobs:  deep-code-analysis:
               // Запущено через workflow_dispatch
               prNumber = context.payload.inputs.pr_number;
             }
-            
-            core.setOutput('pr_number', prNumber);
+              core.setOutput('pr_number', prNumber);
             return { prNumber };
       
       - name: Настройка Python
@@ -59,7 +59,8 @@ jobs:  deep-code-analysis:
         with:
           python-version: '3.12'
           cache: 'pip'
-        - name: Установка инструментов анализа
+          
+      - name: Установка инструментов анализа
         run: |
           python -m pip install --upgrade pip
           pip install pylint flake8 mypy pytest bandit black radon lizard
@@ -120,14 +121,14 @@ jobs:  deep-code-analysis:
               baseCommit: prData.baseRefOid
             };
             fs.writeFileSync('pr_metadata.json', JSON.stringify(metadata, null, 2));
-            
-            return {
+              return {
               filesCount: prData.files.nodes.length,
               title: prData.title,
               headCommit: prData.headRefOid,
               baseCommit: prData.baseRefOid
             };
-        - name: Запуск анализа кода
+      
+      - name: Запуск анализа кода
         id: code-analysis
         run: |
           # Запускаем анализ кода с реальными инструментами
@@ -175,9 +176,9 @@ except Exception as e:
             echo "### Общие рекомендации:" >> sequential_analysis.md
             echo "1. Убедитесь, что код соответствует стандарту PEP 8" >> sequential_analysis.md
             echo "2. Напишите исчерпывающие тесты" >> sequential_analysis.md
-            echo "3. Документируйте функции и классы с помощью docstring" >> sequential_analysis.md
-          fi
-        - name: Анализ контекста изменений
+            echo "3. Документируйте функции и классы с помощью docstring" >> sequential_analysis.md          fi
+      
+      - name: Анализ контекста изменений
         id: contextual-analysis
         run: |
           # Анализируем контекст и зависимости используя реальные инструменты
@@ -229,7 +230,8 @@ except Exception as e:
           else
             echo "Файл requirements.txt не найден." >> context_analysis.md
           fi
-        - name: Специализированный анализ FastAPI & MongoDB
+      
+      - name: Специализированный анализ FastAPI & MongoDB
         id: specialized-analysis
         run: |
           # Анализ FastAPI компонентов с использованием реальных инструментов
@@ -315,11 +317,11 @@ try:
                         out.write('- Используйте агрегации для сложных операций\\n\\n')
 except Exception as e:
     print(f'Ошибка при анализе MongoDB: {e}')
-    with open('mongodb_analysis.md', 'a') as out:
-        out.write(f'Ошибка при анализе MongoDB: {e}\\n')
+    with open('mongodb_analysis.md', 'a') as out:        out.write(f'Ошибка при анализе MongoDB: {e}\\n')
 "
           fi
-        - name: Генерация отчета о качестве кода
+      
+      - name: Генерация отчета о качестве кода
         id: generate-quality-report
         run: |
           # Генерация отчета о качестве кода с использованием реальных инструментов
@@ -381,7 +383,7 @@ except Exception as e:
         run: |
           # Объединение всех отчетов в один комплексный анализ
           cat > "deep_analysis.md" << EOL
-          # 🔬 Отчет глубокого анализа с Firecrawl MCP
+          # 🔬 Отчет глубокого анализа кода
           
           ## 🧠 Анализ с последовательным мышлением (Sequential Thinking)
           
@@ -423,7 +425,7 @@ except Exception as e:
           
           ## 🚀 Рекомендации
           
-          На основе глубокого анализа, проведенного Firecrawl MCP с использованием Sequential Thinking:
+          На основе глубокого анализа, проведенного с использованием Sequential Thinking:
           
           1. **Архитектурные аспекты:** $(grep -A 3 "Архитектура\|Architecture" sequential_analysis.md | grep -v "Архитектура\|Architecture" | head -n 1 || echo "Не обнаружено значительных архитектурных проблем.")
           
@@ -454,7 +456,7 @@ except Exception as e:
             }
             
             // Добавляем заголовок с временной меткой
-            const header = `# 🔬 Глубокий анализ с Firecrawl MCP (${new Date().toISOString().split('T')[0]})`;
+            const header = `# 🔬 Глубокий анализ кода (${new Date().toISOString().split('T')[0]})`;
             finalReport = header + "\n\n" + finalReport;
             
             // Публикуем комментарий в PR
