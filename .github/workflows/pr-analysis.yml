@@ -80,14 +80,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Setup Firecrawl MCP v3
+        - name: Setup Python for code analysis
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
           cache: 'pip'
-        with:
-          version: '3.2.0'
+          
+      - name: Install analysis tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pylint pytest coverage pytest-asyncio black mypy bandit lizard radon
       
       - name: Get PR Diff with GraphQL API
         id: pr-diff
@@ -138,9 +140,8 @@ jobs:
               filesCount: files.length,
               commitSha
             };
-      
-      - name: Analyze Code with Firecrawl MCP
-        id: firecrawl-analysis
+        - name: Analyze Code
+        id: code-analysis
         run: |          # Use existing code analysis tools instead of fictitious firecrawl-mcp
           python -c "
 import json
@@ -153,7 +154,7 @@ with open('pr_files.json', 'r') as f:
         print('Error loading PR diff file')
         exit(1)
 
-with open('firecrawl_analysis.md', 'w') as f:
+with open('code_analysis.md', 'w') as f:
     f.write('# Code Analysis Report\\n\\n')
     
     # Simple analysis of changed files
@@ -218,11 +219,10 @@ pip install bandit
           echo "- **Files Changed:** ${{ needs.metadata-collection.outputs.file_count }}" >> review.md
           echo "- **Total Changes:** ${{ needs.metadata-collection.outputs.diff_size }} (additions + deletions)" >> review.md
           echo "" >> review.md
-          
-          # Add Firecrawl MCP analysis
+            # Add code analysis
           echo "### 🧠 Intelligent Code Analysis" >> review.md
           echo "" >> review.md
-          cat firecrawl_analysis.md >> review.md
+          cat code_analysis.md >> review.md
           echo "" >> review.md
           
           # Add security analysis if available
