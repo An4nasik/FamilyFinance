@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     ports:
-      - "127.0.0.1:8080:8080"  # Слушаем только локально
+      - "127.0.0.1:8000:8000"  # Слушаем только локально
     volumes:
       - .:/app:delegated
     depends_on:
@@ -15,7 +15,7 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB=family_finance_db
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     logging:
       driver: json-file
       options:
