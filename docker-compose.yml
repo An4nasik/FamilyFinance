@@ -71,10 +71,11 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "0.0.0.0:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=http://83.69.106.158:8080/grafana/
     volumes:
       - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
       - grafana_data:/var/lib/grafana
