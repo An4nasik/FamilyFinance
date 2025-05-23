@@ -1,3 +1,0 @@
-litestar
-uvicorn
-prometheus_client
