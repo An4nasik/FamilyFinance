@@ -8,6 +8,7 @@ WORKDIR /app
 # 1) копируем только список зависимостей и ставим
 COPY app/requirements.txt /app/
 RUN pip install --upgrade pip && \
+    pip install prometheus-client && \
     pip install -r requirements.txt
 
 # 2) копируем весь код
